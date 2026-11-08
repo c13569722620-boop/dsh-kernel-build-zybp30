@@ -141,26 +141,12 @@ jobs:
           echo "[+] created mtk_gpufreq.h shim"
         fi
         # met_ftrace_touch.h shim
-        MET_DIR=$(find . -path '*met*' -name 'met_ftrace*' 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
-        if [ -n "$MET_DIR" ]; then
-          echo "/* shim */" > "$MET_DIR/met_ftrace_touch.h"
-          echo "[+] created met_ftrace_touch.h shim in $MET_DIR"
-        else
-          # Create in include/trace
-          echo "/* shim */" > include/trace/met_ftrace_touch.h 2>/dev/null || true
-          echo "[+] created met_ftrace_touch.h shim in include/trace"
-        fi
+        echo "/* shim */" > include/trace/met_ftrace_touch.h 2>/dev/null || true
+        echo "[+] created met_ftrace_touch.h shim"
         # linux/pgtable.h shim for KernelSU-Next (4.19 compat)
-        if [ ! -f include/linux/pgtable.h ]; then
-          mkdir -p include/linux
-          cat > include/linux/pgtable.h <<'PGTABLE'
-#ifndef _LINUX_PGTABLE_H
-#define _LINUX_PGTABLE_H
-#include <asm/pgtable.h>
-#endif
-PGTABLE
-          echo "[+] created linux/pgtable.h shim"
-        fi
+        mkdir -p include/linux
+        printf '%s\n' '#ifndef _LINUX_PGTABLE_H' '#define _LINUX_PGTABLE_H' '#include <asm/pgtable.h>' '#endif' > include/linux/pgtable.h
+        echo "[+] created linux/pgtable.h shim"
 
     - name: Build kernel Image.gz
       run: |
