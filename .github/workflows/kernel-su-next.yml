@@ -1,0 +1,126 @@
+name: Build KernelSU Next boot image for ZPD1203 (MT6768)
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'kernel version suffix (e.g. 4.19.191-ksu)'
+        required: true
+        default: '4.19.191-ksu'
+      defconfig:
+        description: 'kernel defconfig'
+        required: true
+        default: 'k69v1_64_k419_defconfig'
+
+env:
+  ARCH: arm64
+  SUBARCH: arm64
+  CROSS_COMPILE: aarch64-linux-gnu-
+  CC: aarch64-linux-gnu-gcc
+  KERNEL_SOURCE: https://github.com/WUNELEZI1/Gale-Kernel-Source.git
+  KERNEL_BRANCH: mt6768-4.19
+  KSU_REPO: https://github.com/KernelSU-Next/KernelSU-Next.git
+  KSU_BRANCH: dev
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+    - name: Checkout builder repo (scripts + your boot_a.img)
+      uses: actions/checkout@v4
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends \
+          build-essential bc bison flex libssl-dev libelf-dev \
+          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu git python3 \
+          libncurses-dev dwarves rsync kmod cpio wget xz-utils
+        sudo ln -sf /usr/bin/python3 /usr/bin/python
+
+    - name: Require boot_a.img in repo
+      run: |
+        test -f boot_a.img || { echo "error: put your boot_a.img at repo root"; exit 1; }
+        ls -l boot_a.img
+
+    - name: Clone kernel source
+      run: |
+        git clone --depth=1 -b ${{ env.KERNEL_BRANCH }} ${{ env.KERNEL_SOURCE }} kernel-source
+        cd kernel-source
+        git log --oneline -3
+
+    - name: Integrate KernelSU Next
+      run: |
+        cd kernel-source
+        git clone --depth=1 -b ${{ env.KSU_BRANCH }} ${{ env.KSU_REPO }} kernelsu-next
+        ln -sfn ../kernelsu-next/kernel drivers/kernelsu
+        printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> drivers/Makefile
+        echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
+
+    - name: Configure kernel
+      run: |
+        cd kernel-source
+        rm -f .config
+        make ${{ github.event.inputs.defconfig }}
+        {
+          echo "# KernelSU Next integration (added by build)"
+          echo "CONFIG_MODULES=y"
+          echo "CONFIG_MODVERSIONS=n"
+          echo "CONFIG_MODULE_UNLOAD=y"
+          echo "CONFIG_EXT4_FS=y"
+          echo "CONFIG_KPROBES=y"
+          echo "CONFIG_KSU=y"
+          echo "CONFIG_KSU_DEBUG=n"
+        } >> .config
+        make olddefconfig
+        echo "--- key configs ---"
+        grep -E 'CONFIG_MODULES|CONFIG_MODVERSIONS|CONFIG_EXT4_FS|CONFIG_KPROBES|CONFIG_KSU' .config || true
+
+    - name: Set kernel version to 4.19.191-ksu
+      run: |
+        cd kernel-source
+        sed -i 's/^VERSION = .*/VERSION = 4/' Makefile
+        sed -i 's/^PATCHLEVEL = .*/PATCHLEVEL = 19/' Makefile
+        sed -i 's/^SUBLEVEL = .*/SUBLEVEL = 191/' Makefile
+        sed -i 's/^EXTRAVERSION = .*/EXTRAVERSION = -ksu/' Makefile
+        grep -E '^VERSION|^PATCHLEVEL|^SUBLEVEL|^EXTRAVERSION' Makefile
+
+    - name: Build kernel Image.gz
+      run: |
+        cd kernel-source
+        make -j$(nproc) Image.gz || make -j$(nproc) Image
+        ls -lh arch/arm64/boot/Image* 2>/dev/null || true
+
+    - name: Repack boot image (kernel swap, keep ramdisk/dtb/cmdline)
+      id: repack
+      run: |
+        cd kernel-source
+        KIMG=arch/arm64/boot/Image.gz
+        [ -f "$KIMG" ] || KIMG=arch/arm64/boot/Image
+        bash ../scripts/repack_boot.sh \
+          --extract ../boot_a.img \
+          --kernel "$KIMG" \
+          --out boot_a_ksu.img
+        ls -l boot_a_ksu.img
+
+    - name: Build AnyKernel3 flashable zip
+      run: |
+        rm -rf ak3 && mkdir -p ak3/kernel ak3/META-INF/com/google/android
+        cp kernel-source/boot_a_ksu.img ak3/kernel/boot.img
+        cp anykernel3/anykernel.sh ak3/anykernel.sh
+        cp anykernel3/META-INF/com/google/android/updater-script ak3/META-INF/com/google/android/updater-script
+        cd ak3
+        zip -r9 ../anykernel3-zpd1203-ksu.zip . -x '.*' __MACOSX
+        cd ..
+        ls -l anykernel3-zpd1203-ksu.zip
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: boot-img-ksu
+        path: |
+          kernel-source/boot_a_ksu.img
+          anykernel3-zpd1203-ksu.zip
+        retention-days: 7
