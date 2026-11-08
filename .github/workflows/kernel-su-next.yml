@@ -71,6 +71,7 @@ jobs:
           echo "# Disable problematic features for 4.19 compat"
           echo "CONFIG_UCLAMP_TASK=n"
           echo "CONFIG_BLK_INLINE_ENCRYPTION=n"
+          echo "CONFIG_SND_SOC_RICHTEK_SPM_CLS=n"
         } >> .config
         make olddefconfig
         echo "--- key configs ---"
@@ -139,6 +140,15 @@ jobs:
         # Also disable all dvfsrc directories
         find drivers -path '*dvfsrc*' -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
         echo "[+] all dvfsrc source files (all dirs) disabled"
+
+    - name: Fix KernelSU-Next 4.19 compat
+      run: |
+        cd kernel-source
+        # Fix strncpy_from_user_nofault -> strncpy_from_user
+        if grep -q 'strncpy_from_user_nofault' drivers/kernelsu/feature/sucompat.c; then
+          sed -i 's/strncpy_from_user_nofault/strncpy_from_user/g' drivers/kernelsu/feature/sucompat.c
+          echo "[+] Patched sucompat.c strncpy_from_user_nofault -> strncpy_from_user"
+        fi
 
     - name: Create missing header shims
       run: |
