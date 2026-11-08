@@ -36,9 +36,13 @@ jobs:
         sudo apt-get update -y
         sudo apt-get install -y --no-install-recommends \
           build-essential bc bison flex libssl-dev libelf-dev \
-          gcc-aarch64-linux-gnu g++-aarch64-linux-gnu git python3 \
+          gcc-9-aarch64-linux-gnu g++-9-aarch64-linux-gnu git python3 \
           libncurses-dev dwarves rsync kmod cpio wget xz-utils
         sudo ln -sf /usr/bin/python3 /usr/bin/python
+        # Use GCC 9 toolchain (compatible with 4.19 kernel)
+        sudo ln -sf /usr/bin/aarch64-linux-gnu-gcc-9 /usr/bin/aarch64-linux-gnu-gcc
+        sudo ln -sf /usr/bin/aarch64-linux-gnu-g++-9 /usr/bin/aarch64-linux-gnu-g++
+        aarch64-linux-gnu-gcc --version | head -1
 
     - name: Require boot_a.img in repo
       run: |
@@ -112,11 +116,12 @@ jobs:
           find "$DVFSRC_DIR" -name "*.c" -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
           echo "[+] DVFSRC source files disabled as fallback"
         fi
-        # Also disable helio-dvfsrc-ipi.c (missing helio-dvfsrc-ipi.h header)
-        if [ -f "drivers/devfreq/helio-dvfsrc-ipi.c" ]; then
-          echo "/* disabled */" > drivers/devfreq/helio-dvfsrc-ipi.c
-          echo "[+] helio-dvfsrc-ipi.c disabled"
-        fi
+        # Also disable all helio-dvfsrc variants (missing headers)
+        find drivers/devfreq -name '*dvfsrc*' -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
+        echo "[+] all dvfsrc source files disabled"
+        # Also disable all dvfsrc directories
+        find drivers -path '*dvfsrc*' -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
+        echo "[+] all dvfsrc source files (all dirs) disabled"
 
     - name: Build kernel Image.gz
       run: |
