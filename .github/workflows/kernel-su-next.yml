@@ -142,6 +142,10 @@ jobs:
         echo "[+] all dvfsrc source files (all dirs) disabled"
         # Disable KernelSU SELinux rules (incompatible with 4.19 MTK kernel)
         rm -f drivers/kernelsu/selinux/*.c 2>/dev/null || true
+        if [ -f drivers/kernelsu/Makefile ]; then
+          sed -i '/selinux/d' drivers/kernelsu/Makefile
+          echo "[+] Removed selinux from drivers/kernelsu/Makefile"
+        fi
         echo "[+] KernelSU SELinux rules disabled"
         # Fix MODULE_IMPORT_NS (not available in 4.19)
         if grep -rq 'MODULE_IMPORT_NS' drivers/kernelsu/; then
@@ -164,7 +168,9 @@ jobs:
         # mtk_ftrace.h shim
         echo "/* shim */" > include/trace/mtk_ftrace.h 2>/dev/null || true
         echo "/* shim */" > kernel/trace/mtk_ftrace.h 2>/dev/null || true
-        echo "[+] created mtk_ftrace.h shim"
+        # met_ftrace_touch.h shim
+        echo "/* shim */" > include/trace/met_ftrace_touch.h 2>/dev/null || true
+        echo "[+] created mtk_ftrace.h + met_ftrace_touch.h shims"
         # linux/pgtable.h shim for KernelSU-Next (4.19 compat)
         mkdir -p include/linux
         printf '%s\n' '#ifndef _LINUX_PGTABLE_H' '#define _LINUX_PGTABLE_H' '#include <asm/pgtable.h>' '#endif' > include/linux/pgtable.h
