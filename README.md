@@ -95,3 +95,5 @@ fastboot reboot
 - 本工作流使用 `workflow_dispatch` 手动触发，不会定时自动编译。
 - `boot_a.img` 不应上传到公开仓库（属于设备固件），建议使用私有仓库。
 - 构建 artifact 保留 7 天，请及时下载。
+
+<!-- build trigger -->
