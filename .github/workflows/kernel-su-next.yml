@@ -97,6 +97,22 @@ jobs:
           echo "[+] Removed $TS_FILE and $TS_C"
         fi
 
+    - name: Disable problematic DVFSRC drivers
+      run: |
+        cd kernel-source
+        {
+          echo "CONFIG_MTK_DVFSRC=n"
+          echo "CONFIG_MTK_DVFSRC_MT6768=n"
+          echo "CONFIG_MTK_DVFSRC_HELPER=n"
+        } >> .config
+        yes "" | make oldconfig >/dev/null 2>&1 || true
+        # Fallback: if dvfsrc directory still causes errors, disable source files
+        DVFSRC_DIR="drivers/misc/mediatek/dvfsrc"
+        if [ -d "$DVFSRC_DIR" ]; then
+          find "$DVFSRC_DIR" -name "*.c" -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
+          echo "[+] DVFSRC source files disabled as fallback"
+        fi
+
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
