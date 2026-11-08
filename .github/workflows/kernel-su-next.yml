@@ -109,16 +109,14 @@ jobs:
           sed -i 's/always_inline/inline/g' kernel/sched/sched.h
           echo "[+] Patched sched.h always_inline -> inline"
         fi
-        # Fix ksm_flock inlining failure (broad replace)
-        if grep -q 'always_inline' include/linux/keyslot-manager.h; then
-          sed -i 's/always_inline/inline/g' include/linux/keyslot-manager.h
+        # Fix ksm_flock inlining failure (broad replace, handle both variants)
+        if grep -qE 'always_inline|__always_inline' include/linux/keyslot-manager.h; then
+          sed -i 's/__always_inline/inline/g; s/always_inline/inline/g' include/linux/keyslot-manager.h
           echo "[+] Patched keyslot-manager.h always_inline -> inline"
         fi
-        # Also check for __always_inline variant
-        grep -rl '__always_inline' kernel/sched/sched.h include/linux/keyslot-manager.h 2>/dev/null | while read f; do
-          sed -i 's/__always_inline/inline/g' "$f"
-          echo "[+] Patched $f __always_inline -> inline"
-        done
+        # Also handle __always_inline in sched.h
+        sed -i 's/__always_inline/inline/g' kernel/sched/sched.h
+        echo "[+] Patched sched.h __always_inline -> inline (if present)"
 
     - name: Disable problematic DVFSRC drivers
       run: |
@@ -141,6 +139,37 @@ jobs:
         # Also disable all dvfsrc directories
         find drivers -path '*dvfsrc*' -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
         echo "[+] all dvfsrc source files (all dirs) disabled"
+
+    - name: Create missing header shims
+      run: |
+        cd kernel-source
+        # mtk_gpufreq.h shim
+        MTK_THERMAL_DIR="drivers/misc/mediatek/thermal/mt6768/inc/mach"
+        if [ -d "$MTK_THERMAL_DIR" ]; then
+          echo "/* shim */" > "$MTK_THERMAL_DIR/mtk_gpufreq.h"
+          echo "[+] created mtk_gpufreq.h shim"
+        fi
+        # met_ftrace_touch.h shim
+        MET_DIR=$(find . -path '*met*' -name 'met_ftrace*' 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+        if [ -n "$MET_DIR" ]; then
+          echo "/* shim */" > "$MET_DIR/met_ftrace_touch.h"
+          echo "[+] created met_ftrace_touch.h shim in $MET_DIR"
+        else
+          # Create in include/trace
+          echo "/* shim */" > include/trace/met_ftrace_touch.h 2>/dev/null || true
+          echo "[+] created met_ftrace_touch.h shim in include/trace"
+        fi
+        # linux/pgtable.h shim for KernelSU-Next (4.19 compat)
+        if [ ! -f include/linux/pgtable.h ]; then
+          mkdir -p include/linux
+          cat > include/linux/pgtable.h <<'PGTABLE'
+#ifndef _LINUX_PGTABLE_H
+#define _LINUX_PGTABLE_H
+#include <asm/pgtable.h>
+#endif
+PGTABLE
+          echo "[+] created linux/pgtable.h shim"
+        fi
 
     - name: Build kernel Image.gz
       run: |
