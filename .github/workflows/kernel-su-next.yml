@@ -2,15 +2,6 @@ name: Build KernelSU Next boot image for ZPD1203 (MT6768)
 
 on:
   workflow_dispatch:
-    inputs:
-      kernel_version:
-        description: 'kernel version suffix (e.g. 4.19.191-ksu)'
-        required: true
-        default: '4.19.191-ksu'
-      defconfig:
-        description: 'kernel defconfig'
-        required: true
-        default: 'k69v1_64_k419_defconfig'
 
 env:
   ARCH: arm64
@@ -67,7 +58,7 @@ jobs:
       run: |
         cd kernel-source
         rm -f .config
-        make ${{ github.event.inputs.defconfig }}
+        make k69v1_64_k419_defconfig
         {
           echo "# KernelSU Next integration (added by build)"
           echo "CONFIG_MODULES=y"
