@@ -53,12 +53,20 @@ echo "=== [4/6] Pin kernel SUBLEVEL to 191 (match stock vermagic) ==="
 sed -i 's/^SUBLEVEL = .*/SUBLEVEL = 191/' kernel-source/Makefile
 
 # Patch: fix trace_mmstat.h circular include (TRACE_INCLUDE_PATH not set)
-if [ -f kernel-source/kernel/trace/trace_mmstat.h ]; then
-  if ! grep -q "define TRACE_INCLUDE_PATH" kernel-source/kernel/trace/trace_mmstat.h; then
-    sed -i '/#include <trace\/define_trace.h>/i #undef TRACE_INCLUDE_PATH\n#define TRACE_INCLUDE_PATH .' kernel-source/kernel/trace/trace_mmstat.h
-    echo "[+] Patched trace_mmstat.h with TRACE_INCLUDE_PATH"
+TS_FILE=$(find kernel-source -name "trace_mmstat.h" 2>/dev/null | head -1)
+if [ -n "$TS_FILE" ]; then
+  if ! grep -q "define TRACE_INCLUDE_PATH" "$TS_FILE"; then
+    sed -i '/#include <trace\/define_trace.h>/i #undef TRACE_INCLUDE_PATH\n#define TRACE_INCLUDE_PATH .' "$TS_FILE"
+    echo "[+] Patched $TS_FILE with TRACE_INCLUDE_PATH"
+  else
+    echo "[+] $TS_FILE already has TRACE_INCLUDE_PATH"
   fi
+else
+  echo "[!] trace_mmstat.h not found, skipping patch"
 fi
+
+echo "=== [5/6] Defconfig + build ==="
+cd kernel-source
 make ARCH=arm64 k69v1_64_k419_defconfig
 
 if [ "$KSU_OK" = "true" ]; then
