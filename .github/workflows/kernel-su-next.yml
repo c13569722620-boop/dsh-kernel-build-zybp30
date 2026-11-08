@@ -112,6 +112,11 @@ jobs:
           find "$DVFSRC_DIR" -name "*.c" -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
           echo "[+] DVFSRC source files disabled as fallback"
         fi
+        # Also disable helio-dvfsrc-ipi.c (missing helio-dvfsrc-ipi.h header)
+        if [ -f "drivers/devfreq/helio-dvfsrc-ipi.c" ]; then
+          echo "/* disabled */" > drivers/devfreq/helio-dvfsrc-ipi.c
+          echo "[+] helio-dvfsrc-ipi.c disabled"
+        fi
 
     - name: Build kernel Image.gz
       run: |
