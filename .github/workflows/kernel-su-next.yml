@@ -104,16 +104,21 @@ jobs:
     - name: Fix always_inline errors
       run: |
         cd kernel-source
-        # Fix uclamp_se_set inlining failure
-        if grep -q 'always_inline.*uclamp_se_set\|uclamp_se_set.*always_inline' kernel/sched/sched.h; then
+        # Fix uclamp_se_set inlining failure (broad replace)
+        if grep -q 'always_inline' kernel/sched/sched.h; then
           sed -i 's/always_inline/inline/g' kernel/sched/sched.h
           echo "[+] Patched sched.h always_inline -> inline"
         fi
-        # Fix ksm_flock inlining failure
+        # Fix ksm_flock inlining failure (broad replace)
         if grep -q 'always_inline' include/linux/keyslot-manager.h; then
           sed -i 's/always_inline/inline/g' include/linux/keyslot-manager.h
           echo "[+] Patched keyslot-manager.h always_inline -> inline"
         fi
+        # Also check for __always_inline variant
+        grep -rl '__always_inline' kernel/sched/sched.h include/linux/keyslot-manager.h 2>/dev/null | while read f; do
+          sed -i 's/__always_inline/inline/g' "$f"
+          echo "[+] Patched $f __always_inline -> inline"
+        done
 
     - name: Disable problematic DVFSRC drivers
       run: |
