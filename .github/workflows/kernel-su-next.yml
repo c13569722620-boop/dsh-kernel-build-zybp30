@@ -101,6 +101,20 @@ jobs:
           echo "[+] Removed $TS_FILE and $TS_C"
         fi
 
+    - name: Fix always_inline errors
+      run: |
+        cd kernel-source
+        # Fix uclamp_se_set inlining failure
+        if grep -q 'always_inline.*uclamp_se_set\|uclamp_se_set.*always_inline' kernel/sched/sched.h; then
+          sed -i 's/always_inline/inline/g' kernel/sched/sched.h
+          echo "[+] Patched sched.h always_inline -> inline"
+        fi
+        # Fix ksm_flock inlining failure
+        if grep -q 'always_inline' include/linux/keyslot-manager.h; then
+          sed -i 's/always_inline/inline/g' include/linux/keyslot-manager.h
+          echo "[+] Patched keyslot-manager.h always_inline -> inline"
+        fi
+
     - name: Disable problematic DVFSRC drivers
       run: |
         cd kernel-source
