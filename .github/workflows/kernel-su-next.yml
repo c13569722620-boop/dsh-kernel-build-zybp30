@@ -68,6 +68,9 @@ jobs:
           echo "CONFIG_KPROBES=y"
           echo "CONFIG_KSU=y"
           echo "CONFIG_KSU_DEBUG=n"
+          echo "# Disable problematic features for 4.19 compat"
+          echo "CONFIG_UCLAMP_TASK=n"
+          echo "CONFIG_BLK_INLINE_ENCRYPTION=n"
         } >> .config
         make olddefconfig
         echo "--- key configs ---"
