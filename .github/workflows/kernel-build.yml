@@ -1,0 +1,44 @@
+name: Build ZYBP30 Kernel (MT6768, android12-5.10 base / 4.19 BSP)
+
+on:
+  workflow_dispatch:
+    inputs:
+      with_ksu:
+        description: 'Build with KernelSU (v1.0.0 core_hook)'
+        required: false
+        default: 'true'
+      ksu_ref:
+        description: 'KernelSU tag/branch'
+        required: false
+        default: 'v1.0.0'
+
+env:
+  WITH_KSU: ${{ github.event.inputs.with_ksu }}
+  KSU_REF: ${{ github.event.inputs.ksu_ref }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            bc bison build-essential clang flex libelf-dev libncurses-dev \
+            libssl-dev lld llvm python3 xz-utils \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+      - name: Build kernel and pack boot image
+        run: |
+          chmod +x pack_boot.sh
+          WITH_KSU="${WITH_KSU}" KSU_REF="${KSU_REF}" ./pack_boot.sh
+
+      - name: Upload boot image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot_ksu_img
+          path: boot_ksu.img
+          retention-days: 7
