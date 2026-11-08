@@ -1,60 +1,97 @@
-# ZYBP30 (MT6768) Kernel Build — GitHub Actions
+# KernelSU Next boot image build for ZYB ZPD1203 (MT6768)
 
-This repository builds the **MediaTek MT6768 (k69v1_64_k419)** device kernel
-from `WUNELEZI1/Gale-Kernel-Source` branch `mt6768-4.19` and repacks a
-flashable `boot_ksu.img` for the ZYBP30 tablet (ZPD1203, Android 12, A/B).
+本目录用于在 **GitHub Actions** 云端编译 ZPD1203 (MT6768, Android 12, A/B) 的
+KernelSU Next 集成内核，并重打包为 `boot.img` + `AnyKernel3.zip`。
 
-## What was detected from your boot_a.img
+## 设备信息
 
-| Item | Value |
-|------|-------|
-| Image format | Android boot image v2 (page 2048), with embedded DTB |
-| Current kernel | Linux **4.19.191**, clang 11.0.1 (Android NDK r383902), arm64 SMP PREEMPT |
-| Platform | **MediaTek MT6768** (`fstab.mt6768`, `init.recovery.mt6768.rc`, DTB compat `mediatek,mt6768`) |
-| Ramdisk | gzip cpio, recovery-as-boot, `buildvariant=user` |
-| GKI | ❌ Non-GKI (vendor modules + MTK BSP DTB) |
+| 项目 | 值 |
+|------|-----|
+| 设备 | ZYB ZPD1203 / ZYBP30 |
+| 平台 | MediaTek MT6768 |
+| 板型 | k69v1_64_k419 |
+| Android | 12 |
+| 分区 | A/B (boot_a / boot_b) |
+| 内核 | Linux 4.19.191 |
+| SU 方案 | KernelSU Next (v3.x, dev 分支) |
+| 启动镜像 | Android boot image v2 (ANDROID! magic), page_size 2048, dtb 嵌入 boot |
 
-> ⚠️ Because this is a **non-GKI 4.19 MTK device**, a pure AOSP `android12-5.10`
-> GKI kernel will **not boot** on it. This build compiles the device-specific
-> **4.19 BSP kernel** (the correct baseline for ZYBP30) with optional KernelSU,
-> then repacks it using your stock boot header parameters.
+## 目录结构
 
-## Build inputs (from stock boot_a.img)
+```
+kbuild/
+├── .github/workflows/kernel-su-next.yml   # GitHub Actions 编译工作流
+├── scripts/repack_boot.sh                  # boot.img 重打包脚本 (纯 shell)
+├── anykernel3/anykernel.sh                 # AnyKernel3 安装脚本 (模板)
+├── anykernel3/META-INF/com/google/android/updater-script
+├── boot_a.img                              # <-- 放入你的原厂 boot_a.img (33,554,432 字节)
+└── README.md                               # 本文件
+```
 
-| Parameter | Value |
-|-----------|-------|
-| `--kernel_offset` | `0x40080000` |
-| `--ramdisk_offset` | `0x47c80000` |
-| `--tags_offset` | `0x4bc80000` |
-| `--dtb_addr` | `0x4bc80000` |
-| `--page_size` | `2048` |
-| `--header_version` | `2` |
-| `--os_version` | `0x18000187` (Android 12) |
-| `--cmdline` | `bootopt=64S3,32N2,64N2 buildvariant=user` |
-| Ramdisk / DTB | Reused from stock `boot_a.img` |
+## 准备工作 (由你在 GitHub 完成)
 
-## How to trigger a build
+1. **Fork 或创建一个仓库**，把本目录 (`kbuild/` 的全部内容) 推上去。
+2. 将你设备的原厂 `boot_a.img` 放到仓库根目录，文件名必须为 `boot_a.img`。
+   - 大小应为 33,554,432 字节 (32 MiB)。
+   - 如果没有 `boot_a.img`，可用 `boot_b.img` 重命名。
+3. 在仓库的 **Actions** 页面启用 workflow，手动触发 `Build KernelSU Next boot image for ZPD1203 (MT6768)`。
 
-1. Fork / create this repo under your GitHub account.
-2. Enable **Actions** in the repo settings.
-3. Go to **Actions → Build ZYBP30 Kernel → Run workflow**.
-4. Choose whether to include **KernelSU** (default: yes).
-5. When finished, download the `boot_ksu_img` artifact from the run summary.
+## 工作流做什么
 
-## Output
+1. 安装交叉编译工具链 (`aarch64-linux-gnu-gcc` 等)。
+2. 克隆 `WUNELEZI1/Gale-Kernel-Source` (分支 `mt6768-4.19`) 作为内核源码。
+3. 集成 `KernelSU-Next` (分支 `dev`)：
+   - `drivers/kernelsu` 符号链接
+   - `drivers/Makefile` 追加 `obj-$(CONFIG_KSU) += kernelsu/`
+   - `drivers/Kconfig` 追加 `source "drivers/kernelsu/Kconfig"`
+4. 使用 `k69v1_64_k419_defconfig`，并补全 KernelSU-Next 所需配置：
+   - `CONFIG_MODULES=y`, `CONFIG_EXT4_FS=y`, `CONFIG_KPROBES=y`, `CONFIG_KSU=y`
+5. 交叉编译 arm64 `Image.gz` (版本字符串设为 `4.19.191-ksu`)。
+6. 用 `scripts/repack_boot.sh` 从 `boot_a.img` 提取原 ramdisk + dtb + cmdline，替换内核，重新打包 v2 header (偏移与原镜像一致)。
+7. 打包 `AnyKernel3.zip` (支持 boot_a + boot_b)。
+8. 上传 `boot_a_ksu.img` 和 `anykernel3-zpd1203-ksu.zip` 作为构建 artifact (保留 7 天)。
 
-- `boot_ksu.img` — repacked boot image (new kernel + stock ramdisk + stock/new DTB).
-  Flash with fastboot: `fastboot flash boot_a boot_ksu.img` (or `boot_b` for A/B slot B).
+## 关键参数 (与原镜像保持一致)
 
-## KernelSU notes
+```
+--page_size 2048
+--header_version 2
+--kernel_addr   0x40080000
+--ramdisk_addr  0x47c80000
+--tags_addr     0x4bc80000
+--cmdline       bootopt=64S3,32N2,64N2 buildvariant=user
+```
 
-- Uses `tiann/KernelSU` `v1.0.0` (core_hook / ftrace-based mode).
-- On 4.19 MTK BSP, core_hook compatibility is **not guaranteed**. If the build
-  fails because of KSU, re-run with **with_ksu = false** to get a clean kernel.
-- KernelSU Manager APK must be installed separately to manage root.
+重打包脚本 `scripts/repack_boot.sh` 会从原 `boot_a.img` 自动读取并保留：
+- ramdisk (gzip cpio) 和 dtb (MTK 魔数 d7b7ab1e)
+- cmdline (`bootopt=64S3,32N2,64N2 buildvariant=user`)
+- page size、header size、各分区偏移
 
-## Source references
+## 刷入方式
 
-- Kernel source: https://github.com/WUNELEZI1/Gale-Kernel-Source (branch `mt6768-4.19`)
-- KernelSU: https://github.com/tiann/KernelSU (tag `v1.0.0`)
-- Build precedent: https://github.com/WUNELEZI1/Build_zybp30_kernel
+构建完成后从 Actions artifact 下载：
+
+**方法 A — AnyKernel3 (推荐，recovery 刷入)**
+1. 将 `anykernel3-zpd1203-ksu.zip` 放入手机内存或 U 盘。
+2. 进入 TWRP / OrangeFox 等 recovery。
+3. 选择 Install → 选中该 zip → 刷入。
+4. 重启。
+
+**方法 B — fastboot (A/B 分区)**
+```
+fastboot flash boot_a boot_a_ksu.img
+fastboot flash boot_b boot_a_ksu.img   # 同一镜像刷入两个槽位
+fastboot reboot
+```
+
+## 事后
+
+- 安装 **KernelSU Manager APK** 以获取 root 管理界面（工作流不包含 APK，需自行从 KernelSU-Next 官方下载）。
+- 如需修改内核配置，编辑工作流中 `Configure kernel` 步骤追加的 `.config` 行，或在构建前插入 `make menuconfig`（需交互，不适合云端）。
+- 如编译失败，查看 Actions 日志中的 `Configure kernel` / `Build kernel` 输出，核对 defconfig 名称与源码分支。
+
+## 注意事项
+
+- 本工作流使用 `workflow_dispatch` 手动触发，不会定时自动编译。
+- `boot_a.img` 不应上传到公开仓库（属于设备固件），建议使用私有仓库。
+- 构建 artifact 保留 7 天，请及时下载。
