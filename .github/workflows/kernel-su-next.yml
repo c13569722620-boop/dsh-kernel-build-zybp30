@@ -177,7 +177,7 @@ jobs:
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
-        make -j$(nproc) KCFLAGS="-Wno-error" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error" Image
+        make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
 
     - name: Repack boot image (kernel swap, keep ramdisk/dtb/cmdline)
