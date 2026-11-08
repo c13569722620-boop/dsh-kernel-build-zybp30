@@ -1,6 +1,6 @@
 name: Build KernelSU Next boot image for ZPD1203 (MT6768)
 
-'on':
+on:
   workflow_dispatch:
     inputs:
       kernel_version:
