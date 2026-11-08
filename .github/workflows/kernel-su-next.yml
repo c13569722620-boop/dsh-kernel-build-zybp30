@@ -87,6 +87,16 @@ jobs:
         sed -i 's/^EXTRAVERSION = .*/EXTRAVERSION = -ksu/' Makefile
         grep -E '^VERSION|^PATCHLEVEL|^SUBLEVEL|^EXTRAVERSION' Makefile
 
+    - name: Fix trace_mmstat build issue
+      run: |
+        cd kernel-source
+        TS_FILE=$(find . -name "trace_mmstat.h" 2>/dev/null | head -1)
+        TS_C=$(find . -name "trace_mmstat.c" 2>/dev/null | head -1)
+        if [ -n "$TS_FILE" ]; then
+          rm -f "$TS_FILE" "$TS_C"
+          echo "[+] Removed $TS_FILE and $TS_C"
+        fi
+
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
