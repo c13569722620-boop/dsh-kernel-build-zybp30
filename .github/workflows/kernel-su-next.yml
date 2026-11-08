@@ -141,7 +141,8 @@ jobs:
         find drivers -path '*dvfsrc*' -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
         echo "[+] all dvfsrc source files (all dirs) disabled"
         # Disable KernelSU SELinux rules (incompatible with 4.19 MTK kernel)
-        find drivers/kernelsu -path '*selinux*' -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
+        find drivers/kernelsu -name 'rules.c' -path '*selinux*' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
+        find drivers/kernelsu -name '*.c' | grep -i selinux | while read f; do echo "/* disabled */" > "$f"; echo "disabled $f"; done
         echo "[+] KernelSU SELinux rules disabled"
         # Fix MODULE_IMPORT_NS (not available in 4.19)
         if grep -rq 'MODULE_IMPORT_NS' drivers/kernelsu/; then
