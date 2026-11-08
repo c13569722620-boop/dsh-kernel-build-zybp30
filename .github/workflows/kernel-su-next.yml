@@ -92,6 +92,12 @@ jobs:
         TS_C=$(find . -name "trace_mmstat.c" 2>/dev/null | head -1)
         if [ -n "$TS_FILE" ]; then
           rm -f "$TS_FILE" "$TS_C"
+          # Also remove from Makefile
+          TS_DIR=$(dirname "$TS_C")
+          if [ -f "$TS_DIR/Makefile" ]; then
+            sed -i '/trace_mmstat/d' "$TS_DIR/Makefile"
+            echo "[+] Removed trace_mmstat from $TS_DIR/Makefile"
+          fi
           echo "[+] Removed $TS_FILE and $TS_C"
         fi
 
