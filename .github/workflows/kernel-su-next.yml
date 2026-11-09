@@ -140,18 +140,19 @@ jobs:
         # Also disable all dvfsrc directories
         find drivers -path '*dvfsrc*' -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \;
         echo "[+] all dvfsrc source files (all dirs) disabled"
-        # Disable KernelSU SELinux rules (incompatible with 4.19 MTK kernel)
+        # Disable KernelSU SELinux-dependent files (incompatible with 4.19 MTK kernel)
         rm -f drivers/kernelsu/selinux/*.c 2>/dev/null || true
+        rm -f drivers/kernelsu/sucompat.c 2>/dev/null || true
         if [ -f drivers/kernelsu/Makefile ]; then
-          sed -i '/selinux/d' drivers/kernelsu/Makefile
-          echo "[+] Removed selinux from drivers/kernelsu/Makefile"
+          sed -i '/selinux/d; /sucompat/d' drivers/kernelsu/Makefile
+          echo "[+] Removed selinux+sucompat from drivers/kernelsu/Makefile"
         fi
         # Remove SELinux includes from KernelSU source
         if grep -rl '#include.*objsec\|#include.*policydb\|#include.*ss/' drivers/kernelsu/ 2>/dev/null; then
           sed -i 's|#include.*objsec.*|/* objsec disabled */|g; s|#include.*policydb.*|/* policydb disabled */|g; s|#include.*ss/.*|/* ss disabled */|g' $(grep -rl '#include.*objsec\|#include.*policydb\|#include.*ss/' drivers/kernelsu/)
           echo "[+] Removed SELinux includes from KernelSU"
         fi
-        echo "[+] KernelSU SELinux rules disabled"
+        echo "[+] KernelSU SELinux-dependent files disabled"
         # Fix MODULE_IMPORT_NS (not available in 4.19)
         if grep -rq 'MODULE_IMPORT_NS' drivers/kernelsu/; then
           sed -i '/MODULE_IMPORT_NS/d' $(grep -rl 'MODULE_IMPORT_NS' drivers/kernelsu/)
