@@ -173,6 +173,8 @@ jobs:
         # SELinux shim headers
         mkdir -p include/ss
         echo "/* shim */" > include/ss/policydb.h
+        echo "/* shim */" > include/objsec.h
+        find . -name 'objsec.h' -not -path './include/objsec.h' 2>/dev/null | head -5
         echo "[+] created trace + SELinux shims"
         # linux/pgtable.h shim for KernelSU-Next (4.19 compat)
         mkdir -p include/linux
