@@ -175,10 +175,10 @@ jobs:
         echo "/* shim */" > kernel/trace/mtk_ftrace.h 2>/dev/null || true
         # met_ftrace_touch.h shim
         echo "/* shim */" > include/trace/met_ftrace_touch.h 2>/dev/null || true
-        # SELinux shim headers (only if not already present)
+        # SELinux shim headers (only for KernelSU, don't override kernel headers)
         mkdir -p include/ss
         [ -f include/ss/policydb.h ] || echo "/* shim */" > include/ss/policydb.h
-        [ -f include/objsec.h ] || echo "/* shim */" > include/objsec.h
+        rm -f include/objsec.h 2>/dev/null || true
         echo "[+] created trace + SELinux shims"
         # linux/pgtable.h shim for KernelSU-Next (4.19 compat)
         mkdir -p include/linux
