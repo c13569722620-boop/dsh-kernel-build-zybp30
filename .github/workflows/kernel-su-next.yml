@@ -158,9 +158,10 @@ jobs:
           sed -i '/MODULE_IMPORT_NS/d' $(grep -rl 'MODULE_IMPORT_NS' drivers/kernelsu/)
           echo "[+] Removed MODULE_IMPORT_NS (not available in 4.19)"
         fi
-        # Disable cpufreq_v1 (missing cpuhvfs headers)
+        # Disable cpufreq_v1 and cm_mgr_v1 (missing deps / build errors)
         find drivers/misc/mediatek/base/power/cpufreq_v1 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        echo "[+] disabled cpufreq_v1"
+        find drivers/misc/mediatek/base/power/cm_mgr_v1 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        echo "[+] disabled cpufreq_v1 and cm_mgr_v1"
 
 
     - name: Create missing header shims
