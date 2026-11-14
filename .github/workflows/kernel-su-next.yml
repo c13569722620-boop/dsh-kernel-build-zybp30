@@ -212,7 +212,9 @@ jobs:
         find drivers/power/supply/mediatek/battery -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/power/supply/mediatek/charger -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/misc/mediatek/freqhopping -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        echo "[+] disabled cm_mgr_v1, cpufreq_v1, eem_v2, ppm_v3, spm, ccu, cmdq, cameraisp/dpe, dbgtop, debug_latch, dramc, eccci, emi, ext_disp, extcon, battery, charger, freqhopping, pinctrl-debug source files"
+        find drivers/misc/mediatek/imgsensor -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/leds -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        echo "[+] disabled cm_mgr_v1, cpufreq_v1, eem_v2, ppm_v3, spm, ccu, cmdq, cameraisp/dpe, dbgtop, debug_latch, dramc, eccci, emi, ext_disp, extcon, battery, charger, freqhopping, imgsensor, leds, pinctrl-debug source files"
 
 
     - name: Create missing header shims
