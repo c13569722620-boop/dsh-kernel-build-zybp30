@@ -322,9 +322,6 @@ jobs:
 
         /* strncpy_from_user_nofault (4.19 missing) */
         long strncpy_from_user_nofault(char *to, const char __user *from, unsigned long n) { return 0; }
-
-        /* path_umount */
-        int path_umount(void) { return 0; }
         STUBS_EOF
         echo "obj-y += linker_stubs.o" >> drivers/stub/Makefile
         echo "obj-y += stub/" >> drivers/Makefile
