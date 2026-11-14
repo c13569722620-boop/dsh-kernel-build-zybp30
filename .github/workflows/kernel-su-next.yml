@@ -27,12 +27,12 @@ jobs:
         sudo apt-get update -y
         sudo apt-get install -y --no-install-recommends \
           build-essential bc bison flex libssl-dev libelf-dev \
-          gcc-9-aarch64-linux-gnu g++-9-aarch64-linux-gnu git python3 \
+          gcc-11-aarch64-linux-gnu g++-11-aarch64-linux-gnu git python3 \
           libncurses-dev dwarves rsync kmod cpio wget xz-utils
         sudo ln -sf /usr/bin/python3 /usr/bin/python
-        # Use GCC 9 toolchain (compatible with 4.19 kernel)
-        sudo ln -sf /usr/bin/aarch64-linux-gnu-gcc-9 /usr/bin/aarch64-linux-gnu-gcc
-        sudo ln -sf /usr/bin/aarch64-linux-gnu-g++-9 /usr/bin/aarch64-linux-gnu-g++
+        # Use GCC 11 toolchain (available on Ubuntu 26.04, compatible with 4.19 with -Wno-error)
+        sudo ln -sf /usr/bin/aarch64-linux-gnu-gcc-11 /usr/bin/aarch64-linux-gnu-gcc
+        sudo ln -sf /usr/bin/aarch64-linux-gnu-g++-11 /usr/bin/aarch64-linux-gnu-g++
         aarch64-linux-gnu-gcc --version | head -1
 
     - name: Require boot_a.img in repo
