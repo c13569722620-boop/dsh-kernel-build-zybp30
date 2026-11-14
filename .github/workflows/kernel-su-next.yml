@@ -158,21 +158,40 @@ jobs:
           sed -i '/MODULE_IMPORT_NS/d' $(grep -rl 'MODULE_IMPORT_NS' drivers/kernelsu/)
           echo "[+] Removed MODULE_IMPORT_NS (not available in 4.19)"
         fi
-        # Disable cpufreq_v1, cm_mgr_v1, eem_v2, ppm_v3, spm, ccu, cmdq, pinctrl-debug, cameraisp/dpe, dbgtop, debug_latch, dramc, eccci (missing deps / build errors)
-        find drivers/misc/mediatek/base/power/cpufreq_v1 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/base/power/cm_mgr_v1 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/base/power/eem_v2 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/base/power/ppm_v3 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/base/power/spm -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/ccu -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/cmdq -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/pinctrl/mediatek -name '*_debug.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/cameraisp/dpe -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/dbgtop -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/debug_latch -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/dramc -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/eccci -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        echo "[+] disabled cpufreq_v1, cm_mgr_v1, eem_v2, ppm_v3, spm, ccu, cmdq, pinctrl-debug, cameraisp/dpe, dbgtop, debug_latch, dramc, eccci"
+        # Disable problematic MTK drivers at config level (cleaner than patching source)
+        # Disable optional MTK drivers that lack headers or have build issues
+        sed -i 's/^CONFIG_MTK_CPU_FREQ=y/CONFIG_MTK_CPU_FREQ=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_CM_MGR=y/CONFIG_MTK_CM_MGR=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_EEM=y/CONFIG_MTK_EEM=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_PPM=y/CONFIG_MTK_PPM=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_SPM=y/CONFIG_MTK_SPM=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_CCU=y/CONFIG_MTK_CCU=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_CMDQ=y/CONFIG_MTK_CMDQ=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_DPE=y/CONFIG_MTK_DPE=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_DBGTOP=y/CONFIG_MTK_DBGTOP=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_DEBUG_LATCH=y/CONFIG_MTK_DEBUG_LATCH=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_DRAMC=y/CONFIG_MTK_DRAMC=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_ECCCI=y/CONFIG_MTK_ECCCI=n/' .config 2>/dev/null || true
+        sed -i 's/^CONFIG_MTK_EMI=y/CONFIG_MTK_EMI=n/' .config 2>/dev/null || true
+        # Also disable via scripts/config
+        ./scripts/config --disable MTK_CPU_FREQ 2>/dev/null || true
+        ./scripts/config --disable MTK_CM_MGR 2>/dev/null || true
+        ./scripts/config --disable MTK_EEM 2>/dev/null || true
+        ./scripts/config --disable MTK_PPM 2>/dev/null || true
+        ./scripts/config --disable MTK_SPM 2>/dev/null || true
+        ./scripts/config --disable MTK_CCU 2>/dev/null || true
+        ./scripts/config --disable MTK_CMDQ 2>/dev/null || true
+        ./scripts/config --disable MTK_DPE 2>/dev/null || true
+        ./scripts/config --disable MTK_DBGTOP 2>/dev/null || true
+        ./scripts/config --disable MTK_DEBUG_LATCH 2>/dev/null || true
+        ./scripts/config --disable MTK_DRAMC 2>/dev/null || true
+        ./scripts/config --disable MTK_ECCCI 2>/dev/null || true
+        ./scripts/config --disable MTK_EMI 2>/dev/null || true
+        # Disable problematic pinctrl debug
+        sed -i 's/^CONFIG_PINCTRL_MTK_DEBUG=y/CONFIG_PINCTRL_MTK_DEBUG=n/' .config 2>/dev/null || true
+        ./scripts/config --disable PINCTRL_MTK_DEBUG 2>/dev/null || true
+        make olddefconfig
+        echo "[+] disabled problematic MTK driver configs"
 
 
     - name: Create missing header shims
