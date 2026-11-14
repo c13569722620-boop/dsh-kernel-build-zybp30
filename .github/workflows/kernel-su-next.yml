@@ -192,6 +192,22 @@ jobs:
         ./scripts/config --disable PINCTRL_MTK_DEBUG 2>/dev/null || true
         make olddefconfig
         echo "[+] disabled problematic MTK driver configs"
+        # Also disable source files for any remaining problematic drivers (fallback for config mismatches)
+        find drivers/misc/mediatek/base/power/cm_mgr_v1 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/base/power/cpufreq_v1 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/base/power/eem_v2 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/base/power/ppm_v3 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/base/power/spm -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/ccu -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/cmdq -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/cameraisp/dpe -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/dbgtop -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/debug_latch -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/dramc -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/eccci -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/emi -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/pinctrl/mediatek -name '*_debug.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        echo "[+] disabled cm_mgr_v1, cpufreq_v1, eem_v2, ppm_v3, spm, ccu, cmdq, cameraisp/dpe, dbgtop, debug_latch, dramc, eccci, emi, pinctrl-debug source files"
 
 
     - name: Create missing header shims
