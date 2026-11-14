@@ -327,10 +327,7 @@ jobs:
         int path_umount(void) { return 0; }
         STUBS_EOF
         echo "obj-y += linker_stubs.o" >> drivers/stub/Makefile
-        echo 'source "drivers/stub/Kconfig"' >> drivers/Kconfig 2>/dev/null || true
-        echo "config STUB_LINKER" >> drivers/Kconfig 2>/dev/null || true
-        echo "    bool \"Linker stubs\"" >> drivers/Kconfig 2>/dev/null || true
-        echo "    default y" >> drivers/Kconfig 2>/dev/null || true
+        echo "obj-y += stub/" >> drivers/Makefile
         echo "[+] created linker stubs for undefined symbols"
 
     - name: Build kernel Image.gz
