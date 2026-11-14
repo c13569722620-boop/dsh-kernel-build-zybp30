@@ -223,7 +223,9 @@ jobs:
         find drivers/misc/mediatek/sensors-1.0 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/misc/mediatek/smi -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/misc/mediatek/thermal -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        echo "[+] disabled cm_mgr_v1, cpufreq_v1, eem_v2, ppm_v3, spm, ccu, cmdq, cameraisp/dpe, dbgtop, debug_latch, dramc, eccci, emi, ext_disp, extcon, battery, charger, freqhopping, imgsensor, leds, m4u, mmdvfs, pmic, mtk-pm-qos, mtk_ion, scp, sensors-1.0, smi, thermal, pinctrl-debug source files"
+        find drivers/misc/mediatek/usb20 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/typec -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        echo "[+] disabled cm_mgr_v1, cpufreq_v1, eem_v2, ppm_v3, spm, ccu, cmdq, cameraisp/dpe, dbgtop, debug_latch, dramc, eccci, emi, ext_disp, extcon, battery, charger, freqhopping, imgsensor, leds, m4u, mmdvfs, pmic, mtk-pm-qos, mtk_ion, scp, sensors-1.0, smi, thermal, usb20, typec, pinctrl-debug source files"
 
 
     - name: Create missing header shims
