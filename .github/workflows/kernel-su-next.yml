@@ -269,12 +269,31 @@ jobs:
 
         /* MTK SMI */
         int smi_debug_bus_hang_detect(void) { return 0; }
+        int smi_bus_prepare_enable(void) { return 0; }
+        int smi_bus_disable_unprepare(void) { return 0; }
 
         /* MTK PPM */
         int mt_ppm_sysboost_set_freq_limit(void) { return 0; }
 
         /* MTK CMDQ mailbox */
         void *cmdq_mbox_buf_alloc(void) { return NULL; }
+        void *cmdq_mbox_buf_free(void *b) { }
+        void *cmdq_mbox_create(void) { return NULL; }
+        void *cmdq_register_device(void) { return NULL; }
+
+        /* MTK CMDQ pkt */
+        void *cmdq_pkt_create(void) { return NULL; }
+        void cmdq_pkt_destroy(void *p) { }
+        void cmdq_pkt_write(void *p, void *a, unsigned int v) { }
+        void cmdq_pkt_read_addr(void *p, void *a) { }
+        void cmdq_pkt_poll_addr(void *p, void *a) { }
+        void cmdq_pkt_poll_timeout(void *p, void *a) { }
+        void cmdq_pkt_wfe(void *p, void *a) { }
+        void cmdq_pkt_mem_move(void *p, void *a, unsigned int v) { }
+        void cmdq_pkt_flush_threaded(void *p) { }
+
+        /* MTK dev_get_event */
+        void *cmdq_dev_get_event(void) { return NULL; }
 
         /* MTK PMIC auxadc */
         int pmic_auxadc_chip_init(void) { return 0; }
@@ -290,8 +309,12 @@ jobs:
         void ion_client_destroy(void *c) { }
         void *g_ion_device(void) { return NULL; }
 
+        /* MTK mmdvfs */
+        int mmdvfs_qos_get_freq_steps(void) { return 0; }
+
         /* MTK SPM */
         int spm_resource_req(void) { return 0; }
+        unsigned long get_smem_phy_start_addr(void) { return 0; }
 
         /* MTK idle notifier */
         int mtk_idle_notifier_register(void) { return 0; }
@@ -303,6 +326,9 @@ jobs:
         /* MTK video display */
         int display_recorder_init(void) { return 0; }
         void display_recorder_exit(void) { }
+
+        /* MTK fingerprint */
+        void *uuid_fp(void) { return NULL; }
 
         /* KernelSU compat (sucompat.c removed due to 4.19 incompat) */
         int ksu_sucompat_init(void) { return 0; }
