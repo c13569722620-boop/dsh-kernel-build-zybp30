@@ -207,7 +207,8 @@ jobs:
         find drivers/misc/mediatek/eccci -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/misc/mediatek/emi -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/pinctrl/mediatek -name '*_debug.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        echo "[+] disabled cm_mgr_v1, cpufreq_v1, eem_v2, ppm_v3, spm, ccu, cmdq, cameraisp/dpe, dbgtop, debug_latch, dramc, eccci, emi, pinctrl-debug source files"
+        find drivers/misc/mediatek/ext_disp -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        echo "[+] disabled cm_mgr_v1, cpufreq_v1, eem_v2, ppm_v3, spm, ccu, cmdq, cameraisp/dpe, dbgtop, debug_latch, dramc, eccci, emi, ext_disp, pinctrl-debug source files"
 
 
     - name: Create missing header shims
