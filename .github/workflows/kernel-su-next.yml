@@ -253,6 +253,86 @@ jobs:
         printf '%s\n' '#ifndef _LINUX_PGTABLE_H' '#define _LINUX_PGTABLE_H' '#include <asm/pgtable.h>' '#endif' > include/linux/pgtable.h
         echo "[+] created linux/pgtable.h shim"
 
+    - name: Create linker stubs for undefined symbols
+      run: |
+        cd kernel-source
+        mkdir -p drivers/stub
+        cat > drivers/stub/linker_stubs.c << 'STUBS_EOF'
+        /* Linker stubs for undefined symbols from disabled MTK drivers and KernelSU compat */
+        #include <linux/module.h>
+        #include <linux/string.h>
+
+        /* MTK PM QoS */
+        int mtk_pm_qos_add_request(void) { return 0; }
+        int mtk_pm_qos_remove_request(void) { return 0; }
+        int mtk_pm_qos_update_request(void) { return 0; }
+
+        /* MTK SMI */
+        int smi_debug_bus_hang_detect(void) { return 0; }
+
+        /* MTK PPM */
+        int mt_ppm_sysboost_set_freq_limit(void) { return 0; }
+
+        /* MTK CMDQ mailbox */
+        void *cmdq_mbox_buf_alloc(void) { return NULL; }
+
+        /* MTK PMIC auxadc */
+        int pmic_auxadc_chip_init(void) { return 0; }
+
+        /* MTK ION */
+        void *ion_alloc(void) { return NULL; }
+        void ion_free(void *p) { }
+        void *ion_map_kernel(void *p) { return p; }
+        void ion_unmap_kernel(void *p) { }
+        unsigned long ion_phys(void *p) { return 0; }
+        int ion_share_dma_buf_fd(void *p) { return 0; }
+        void *ion_client_create(void) { return NULL; }
+        void ion_client_destroy(void *c) { }
+        void *g_ion_device(void) { return NULL; }
+
+        /* MTK SPM */
+        int spm_resource_req(void) { return 0; }
+
+        /* MTK idle notifier */
+        int mtk_idle_notifier_register(void) { return 0; }
+
+        /* MTK pwrap/auxadc */
+        int pmic_get_auxadc_value(void) { return 0; }
+        void *pwrap_node_to_regmap(void) { return NULL; }
+
+        /* MTK video display */
+        int display_recorder_init(void) { return 0; }
+        void display_recorder_exit(void) { }
+
+        /* KernelSU compat (sucompat.c removed due to 4.19 incompat) */
+        int ksu_sucompat_init(void) { return 0; }
+        void ksu_sucompat_exit(void) { }
+        int ksu_handle_execveat_sucompat(void) { return 0; }
+        int ksu_get_devpts_sid(void) { return 0; }
+        int apply_kernelsu_rules(void) { return 0; }
+
+        /* KernelSU selinux (disabled) */
+        int setup_selinux(void) { return 0; }
+        int handle_sepolicy(void) { return 0; }
+        int is_zygote(void) { return 0; }
+        int is_ksu_domain(void) { return 0; }
+
+        /* KernelSU path_umount */
+        int path_umount(void) { return 0; }
+
+        /* strncpy_from_user_nofault (4.19 missing) */
+        long strncpy_from_user_nofault(char *to, const char __user *from, unsigned long n) { return 0; }
+
+        /* path_umount */
+        int path_umount(void) { return 0; }
+        STUBS_EOF
+        echo "obj-y += linker_stubs.o" >> drivers/stub/Makefile
+        echo 'source "drivers/stub/Kconfig"' >> drivers/Kconfig 2>/dev/null || true
+        echo "config STUB_LINKER" >> drivers/Kconfig 2>/dev/null || true
+        echo "    bool \"Linker stubs\"" >> drivers/Kconfig 2>/dev/null || true
+        echo "    default y" >> drivers/Kconfig 2>/dev/null || true
+        echo "[+] created linker stubs for undefined symbols"
+
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
