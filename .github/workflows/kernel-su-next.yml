@@ -286,7 +286,7 @@ jobs:
 
         /* MTK CMDQ mailbox */
         KSU_STUB void *cmdq_mbox_buf_alloc(void) { return NULL; }
-        KSU_STUB void *cmdq_mbox_buf_free(void *b) { }
+        KSU_STUB void *cmdq_mbox_buf_free(void *b) { return NULL; }
         KSU_STUB void *cmdq_mbox_create(void) { return NULL; }
         KSU_STUB void *cmdq_register_device(void) { return NULL; }
 
