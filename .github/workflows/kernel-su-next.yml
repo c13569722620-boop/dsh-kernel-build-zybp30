@@ -268,92 +268,108 @@ jobs:
         #include <linux/module.h>
         #include <linux/string.h>
 
+        /* Weak attribute macro for stubs */
+        #define KSU_STUB __attribute__((weak))
+
         /* MTK PM QoS */
-        int mtk_pm_qos_add_request(void) { return 0; }
-        int mtk_pm_qos_remove_request(void) { return 0; }
-        int mtk_pm_qos_update_request(void) { return 0; }
+        KSU_STUB int mtk_pm_qos_add_request(void) { return 0; }
+        KSU_STUB int mtk_pm_qos_remove_request(void) { return 0; }
+        KSU_STUB int mtk_pm_qos_update_request(void) { return 0; }
 
         /* MTK SMI */
-        int smi_debug_bus_hang_detect(void) { return 0; }
-        int smi_bus_prepare_enable(void) { return 0; }
-        int smi_bus_disable_unprepare(void) { return 0; }
+        KSU_STUB int smi_debug_bus_hang_detect(void) { return 0; }
+        KSU_STUB int smi_bus_prepare_enable(void) { return 0; }
+        KSU_STUB int smi_bus_disable_unprepare(void) { return 0; }
 
         /* MTK PPM */
-        int mt_ppm_sysboost_set_freq_limit(void) { return 0; }
+        KSU_STUB int mt_ppm_sysboost_set_freq_limit(void) { return 0; }
 
         /* MTK CMDQ mailbox */
-        void *cmdq_mbox_buf_alloc(void) { return NULL; }
-        void *cmdq_mbox_buf_free(void *b) { }
-        void *cmdq_mbox_create(void) { return NULL; }
-        void *cmdq_register_device(void) { return NULL; }
+        KSU_STUB void *cmdq_mbox_buf_alloc(void) { return NULL; }
+        KSU_STUB void *cmdq_mbox_buf_free(void *b) { }
+        KSU_STUB void *cmdq_mbox_create(void) { return NULL; }
+        KSU_STUB void *cmdq_register_device(void) { return NULL; }
 
         /* MTK CMDQ pkt */
-        void *cmdq_pkt_create(void) { return NULL; }
-        void cmdq_pkt_destroy(void *p) { }
-        void cmdq_pkt_write(void *p, void *a, unsigned int v) { }
-        void cmdq_pkt_read_addr(void *p, void *a) { }
-        void cmdq_pkt_poll_addr(void *p, void *a) { }
-        void cmdq_pkt_poll_timeout(void *p, void *a) { }
-        void cmdq_pkt_wfe(void *p, void *a) { }
-        void cmdq_pkt_mem_move(void *p, void *a, unsigned int v) { }
-        void cmdq_pkt_flush_threaded(void *p) { }
+        KSU_STUB void *cmdq_pkt_create(void) { return NULL; }
+        KSU_STUB void cmdq_pkt_destroy(void *p) { }
+        KSU_STUB void cmdq_pkt_write(void *p, void *a, unsigned int v) { }
+        KSU_STUB void cmdq_pkt_read_addr(void *p, void *a) { }
+        KSU_STUB void cmdq_pkt_poll_addr(void *p, void *a) { }
+        KSU_STUB void cmdq_pkt_poll_timeout(void *p, void *a) { }
+        KSU_STUB void cmdq_pkt_wfe(void *p, void *a) { }
+        KSU_STUB void cmdq_pkt_mem_move(void *p, void *a, unsigned int v) { }
+        KSU_STUB void cmdq_pkt_flush_threaded(void *p) { }
 
         /* MTK dev_get_event */
-        void *cmdq_dev_get_event(void) { return NULL; }
+        KSU_STUB void *cmdq_dev_get_event(void) { return NULL; }
 
         /* MTK PMIC auxadc */
-        int pmic_auxadc_chip_init(void) { return 0; }
+        KSU_STUB int pmic_auxadc_chip_init(void) { return 0; }
 
         /* MTK ION */
-        void *ion_alloc(void) { return NULL; }
-        void ion_free(void *p) { }
-        void *ion_map_kernel(void *p) { return p; }
-        void ion_unmap_kernel(void *p) { }
-        unsigned long ion_phys(void *p) { return 0; }
-        int ion_share_dma_buf_fd(void *p) { return 0; }
-        void *ion_client_create(void) { return NULL; }
-        void ion_client_destroy(void *c) { }
-        void *g_ion_device(void) { return NULL; }
+        KSU_STUB void *ion_alloc(void) { return NULL; }
+        KSU_STUB void ion_free(void *p) { }
+        KSU_STUB void *ion_map_kernel(void *p) { return p; }
+        KSU_STUB void ion_unmap_kernel(void *p) { }
+        KSU_STUB unsigned long ion_phys(void *p) { return 0; }
+        KSU_STUB int ion_share_dma_buf_fd(void *p) { return 0; }
+        KSU_STUB void *ion_client_create(void) { return NULL; }
+        KSU_STUB void ion_client_destroy(void *c) { }
+        KSU_STUB void *g_ion_device(void) { return NULL; }
 
         /* MTK mmdvfs */
-        int mmdvfs_qos_get_freq_steps(void) { return 0; }
+        KSU_STUB int mmdvfs_qos_get_freq_steps(void) { return 0; }
 
         /* MTK SPM */
-        int spm_resource_req(void) { return 0; }
-        unsigned long get_smem_phy_start_addr(void) { return 0; }
+        KSU_STUB int spm_resource_req(void) { return 0; }
+        KSU_STUB unsigned long get_smem_phy_start_addr(void) { return 0; }
 
         /* MTK idle notifier */
-        int mtk_idle_notifier_register(void) { return 0; }
+        KSU_STUB int mtk_idle_notifier_register(void) { return 0; }
 
         /* MTK pwrap/auxadc */
-        int pmic_get_auxadc_value(void) { return 0; }
-        void *pwrap_node_to_regmap(void) { return NULL; }
+        KSU_STUB int pmic_get_auxadc_value(void) { return 0; }
+        KSU_STUB void *pwrap_node_to_regmap(void) { return NULL; }
 
         /* MTK video display */
-        int display_recorder_init(void) { return 0; }
-        void display_recorder_exit(void) { }
+        KSU_STUB int display_recorder_init(void) { return 0; }
+        KSU_STUB void display_recorder_exit(void) { }
 
         /* MTK fingerprint */
-        void *uuid_fp(void) { return NULL; }
+        KSU_STUB void *uuid_fp(void) { return NULL; }
+
+        /* Additional common MTK symbols that may be referenced */
+        KSU_STUB void *mtk_pm_qos_request_active_state(void) { return NULL; }
+        KSU_STUB int mtk_ppm_get_cpu_power(void) { return 0; }
+        KSU_STUB void mtk_ppm_set_cpu_power(void) { }
+        KSU_STUB int smi_num_get_dev(void) { return 0; }
+        KSU_STUB int smi_larb_get_id(void) { return 0; }
+        KSU_STUB void *cmdq_mbox_get_thread(void) { return NULL; }
+        KSU_STUB int cmdq_mbox_exec_cmd_async(void) { return 0; }
+        KSU_STUB void cmdq_core_enable_clock(void) { }
+        KSU_STUB void cmdq_core_disable_clock(void) { }
+        KSU_STUB int pmic_auxadc_init(void) { return 0; }
+        KSU_STUB unsigned int pmic_auxadc_read_channel(void) { return 0; }
 
         /* KernelSU compat (sucompat.c removed due to 4.19 incompat) */
-        int ksu_sucompat_init(void) { return 0; }
-        void ksu_sucompat_exit(void) { }
-        int ksu_handle_execveat_sucompat(void) { return 0; }
-        int ksu_get_devpts_sid(void) { return 0; }
-        int apply_kernelsu_rules(void) { return 0; }
+        KSU_STUB int ksu_sucompat_init(void) { return 0; }
+        KSU_STUB void ksu_sucompat_exit(void) { }
+        KSU_STUB int ksu_handle_execveat_sucompat(void) { return 0; }
+        KSU_STUB int ksu_get_devpts_sid(void) { return 0; }
+        KSU_STUB int apply_kernelsu_rules(void) { return 0; }
 
         /* KernelSU selinux (disabled) */
-        int setup_selinux(void) { return 0; }
-        int handle_sepolicy(void) { return 0; }
-        int is_zygote(void) { return 0; }
-        int is_ksu_domain(void) { return 0; }
+        KSU_STUB int setup_selinux(void) { return 0; }
+        KSU_STUB int handle_sepolicy(void) { return 0; }
+        KSU_STUB int is_zygote(void) { return 0; }
+        KSU_STUB int is_ksu_domain(void) { return 0; }
 
         /* KernelSU path_umount */
-        int path_umount(void) { return 0; }
+        KSU_STUB int path_umount(void) { return 0; }
 
         /* strncpy_from_user_nofault (4.19 missing) */
-        long strncpy_from_user_nofault(char *to, const char __user *from, unsigned long n) { return 0; }
+        KSU_STUB long strncpy_from_user_nofault(char *to, const char __user *from, unsigned long n) { return 0; }
         STUBS_EOF
         echo "obj-y += linker_stubs.o" >> drivers/stub/Makefile
         echo "obj-y += stub/" >> drivers/Makefile
