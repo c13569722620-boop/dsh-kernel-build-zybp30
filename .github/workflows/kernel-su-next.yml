@@ -232,6 +232,14 @@ jobs:
         find drivers/input/fingerprint -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/gpu/drm/mediatek -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/misc/mediatek/mtk_disp_mgr -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        # Disable remaining drivers referencing symbols from disabled MTK drivers (pmic, battery, charger, touch, etc.)
+        find drivers/misc/mediatek/flashlight -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/c2k_usb -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/vibrator -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/jpeg -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/misc/mediatek/dfd -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/input/keyboard/mediatek -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/input/touchscreen -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         echo "[+] disabled additional drivers referencing disabled MTK symbols"
 
 
