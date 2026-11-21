@@ -372,6 +372,100 @@ jobs:
         /* MTK touch tracepoint */
         KSU_STUB void __tracepoint_MET_touch(void) { }
 
+        /* MTK camera/display CMDQ remaining symbols */
+        KSU_STUB void *cmdqRecCreate(void) { return NULL; }
+        KSU_STUB int cmdqRecSetEngine(void) { return 0; }
+        KSU_STUB int cmdqRecSetSecure(void) { return 0; }
+        KSU_STUB int cmdqRecWrite(void) { return 0; }
+        KSU_STUB int cmdqRecWriteSecure(void) { return 0; }
+        KSU_STUB int cmdqRecSecureEnablePortSecurity(void) { return 0; }
+        KSU_STUB int cmdqCoreRegisterCB(void) { return 0; }
+        KSU_STUB int cmdqCoreRegisterDebugRegDumpCB(void) { return 0; }
+        KSU_STUB int cmdq_core_save_first_dump(void) { return 0; }
+        KSU_STUB void *cmdq_task_create(void) { return NULL; }
+        KSU_STUB int cmdq_task_flush(void) { return 0; }
+        KSU_STUB int cmdq_task_flush_async_destroy(void) { return 0; }
+        KSU_STUB int cmdq_task_secure_enable_port_security(void) { return 0; }
+        KSU_STUB int cmdq_task_set_mtee(void) { return 0; }
+        KSU_STUB int cmdq_task_set_secure(void) { return 0; }
+        KSU_STUB int cmdq_task_set_secure_meta(void) { return 0; }
+
+        /* MTK CCU/PPM/EMI */
+        KSU_STUB unsigned long long ccu_get_timestamp(void) { return 0; }
+        KSU_STUB void eem_set_pi_dvtfixed(void) { }
+        KSU_STUB void eem_set_pi_efuse(void) { }
+        KSU_STUB int emi_mpu_set_protection(void) { return 0; }
+        KSU_STUB int dram_steps_freq(void) { return 0; }
+        KSU_STUB int mt_cpufreq_get_cpu_level(void) { return 0; }
+        KSU_STUB int mt_cpufreq_get_freq_by_idx(void) { return 0; }
+        KSU_STUB unsigned long mt_dfs_general_pll(void) { return 0; }
+        KSU_STUB int mt_eem_is_enabled(void) { return 0; }
+        KSU_STUB int mt_ppm_register_client(void) { return 0; }
+        KSU_STUB int mt_ppm_userlimit_cpu_freq(void) { return 0; }
+        KSU_STUB int mt_ppm_userlimit_freq_limit_by_others(void) { return 0; }
+
+        /* MTK battery/charger/gauge remaining symbols */
+        KSU_STUB int register_low_battery_notify(void) { return 0; }
+        KSU_STUB int register_dlpt_notify(void) { return 0; }
+        KSU_STUB int force_get_tbat(void) { return 0; }
+        KSU_STUB int gauge_get_average_current(void) { return 0; }
+        KSU_STUB int gauge_get_current(void) { return 0; }
+        KSU_STUB int gauge_get_nag_vbat(void) { return 0; }
+        KSU_STUB int is_battery_init_done(void) { return 0; }
+        KSU_STUB int is_kernel_power_off_charging(void) { return 0; }
+        KSU_STUB void *get_mtk_battery(void) { return NULL; }
+
+        /* MTK ION remaining symbols */
+        KSU_STUB int ion_get_trust_mem_type(void) { return 0; }
+        KSU_STUB int ion_import_dma_buf_fd(void) { return 0; }
+        KSU_STUB int ion_kernel_ioctl(void) { return 0; }
+        KSU_STUB int ion_mm_heap_memory_detail(void) { return 0; }
+
+        /* MTK PMIC remaining symbols */
+        KSU_STUB int pmic_Read_Efuse_HPOffset(void) { return 0; }
+        KSU_STUB int pmic_config_interface(void) { return 0; }
+        KSU_STUB int pmic_get_battery_voltage(void) { return 0; }
+        KSU_STUB int pmic_get_ibus(void) { return 0; }
+        KSU_STUB int pmic_get_register_value(void) { return 0; }
+        KSU_STUB int pmic_get_vbus(void) { return 0; }
+        KSU_STUB int pmic_is_battery_exist(void) { return 0; }
+        KSU_STUB int pmic_read_interface(void) { return 0; }
+        KSU_STUB int pmic_read_interface_nolock(void) { return 0; }
+
+        /* MTK DBGTOP/DFD remaining symbols */
+        KSU_STUB int mtk_dbgtop_dfd_count_en(void) { return 0; }
+        KSU_STUB int mtk_dbgtop_dfd_therm1_dis(void) { return 0; }
+        KSU_STUB int mtk_dbgtop_dfd_therm2_dis(void) { return 0; }
+        KSU_STUB int mtk_dbgtop_dfd_timeout(void) { return 0; }
+        KSU_STUB int set_sram_flag_dfd_valid(void) { return 0; }
+
+        /* MTK GPU remaining symbols */
+        KSU_STUB int mtk_gpufreq_register(void) { return 0; }
+
+        /* MTK SPM remaining symbols */
+        KSU_STUB unsigned int mtk_spm_read_register(void) { return 0; }
+
+        /* MTK CM MGR remaining symbols */
+        KSU_STUB int cm_mgr_perf_set_status(void) { return 0; }
+
+        /* MTK poll/display remaining symbols */
+        KSU_STUB int polling_rdma_output_line_is_not_zero(void) { return 0; }
+
+        /* MTK PPM game mode */
+        KSU_STUB int ppm_game_mode_change_cb(void) { return 0; }
+
+        /* MTK SMI remaining symbols */
+        KSU_STUB int smi_get_dev_num(void) { return 0; }
+        KSU_STUB int smi_register(void) { return 0; }
+
+        /* MTK switch remaining symbols */
+        KSU_STUB int switch_dev_register(void) { return 0; }
+        KSU_STUB int switch_dev_unregister(void) { return 0; }
+
+        /* MTK CCCI C2K remaining symbols */
+        KSU_STUB int ccci_c2k_buffer_push(void) { return 0; }
+        KSU_STUB int ccci_c2k_rawbulk_intercept(void) { return 0; }
+
         /* KernelSU compat (sucompat.c removed due to 4.19 incompat) */
         KSU_STUB int ksu_sucompat_init(void) { return 0; }
         KSU_STUB void ksu_sucompat_exit(void) { }
@@ -398,10 +492,6 @@ jobs:
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
-        # Patch link-vmlinux.sh to add unresolved-symbols=ignore-all to the
-        # vmlinux link command, catching any remaining MTK driver
-        # cross-references from disabled drivers.
-        sed -i 's/^LD$LDFLAGS/& --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition/' scripts/link-vmlinux.sh
         make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
 
