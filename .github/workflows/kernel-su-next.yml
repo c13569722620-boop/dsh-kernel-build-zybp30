@@ -387,12 +387,14 @@ jobs:
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
-        # Wrap the linker to force --unresolved-symbols=ignore-all into every
-        # link invocation, so remaining MTK driver cross-references don't block
-        # the vmlinux link. Stubs cover known symbols; this catches the rest.
-        printf '#!/bin/bash\nexec /usr/bin/aarch64-linux-gnu-ld "$@" --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition\n' > ld-wrapper.sh
-        chmod +x ld-wrapper.sh
-        export LD=$PWD/ld-wrapper.sh
+        # Wrap aarch64-linux-gnu-ld so every link invocation gets
+        # --unresolved-symbols=ignore-all, avoiding endless whack-a-mole
+        # with disabled MTK driver cross-references. Stubs cover known
+        # symbols; this catches anything left.
+        mkdir -p /tmp/xld
+        printf '#!/bin/bash\nexec /usr/bin/aarch64-linux-gnu-ld "$@" --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition\n' > /tmp/xld/aarch64-linux-gnu-ld
+        chmod +x /tmp/xld/aarch64-linux-gnu-ld
+        export PATH="/tmp/xld:$PATH"
         make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
 
