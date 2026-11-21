@@ -471,6 +471,12 @@ jobs:
         KSU_STUB int ccci_c2k_buffer_push(void) { return 0; }
         KSU_STUB int ccci_c2k_rawbulk_intercept(void) { return 0; }
 
+        /* Additional MTK symbols from Run #62 error log */
+        KSU_STUB int mtk_pm_qos_request_active(void) { return 0; }
+        KSU_STUB int get_smem_start_addr(void) { return 0; }
+        KSU_STUB int mmdvfs_qos_get_freq(void) { return 0; }
+        KSU_STUB void *get_immediate_gpu_wrap(void) { return NULL; }
+
         /* KernelSU compat (sucompat.c removed due to 4.19 incompat) */
         KSU_STUB int ksu_sucompat_init(void) { return 0; }
         KSU_STUB void ksu_sucompat_exit(void) { }
