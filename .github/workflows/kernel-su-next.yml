@@ -387,12 +387,12 @@ jobs:
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
-        # Force unresolved-symbols=ignore-all into the vmlinux link step via
-        # LDFLAGS_vmlinux so remaining MTK driver cross-references don't block
-        # the build. Stubs already cover known symbols; this just lets the
-        # linker finish for anything left.
-        echo 'LDFLAGS_vmlinux += -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition' >> arch/arm64/Makefile
-        make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
+        # Pass unresolved-symbols=ignore-all via KBUILD_LDFLAGS env var so the
+        # vmlinux link step doesn't fail on remaining MTK driver cross-references.
+        KBUILD_LDFLAGS="-Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition" \
+        make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || \
+        KBUILD_LDFLAGS="-Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition" \
+        make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
 
     - name: Repack boot image (kernel swap, keep ramdisk/dtb/cmdline)
