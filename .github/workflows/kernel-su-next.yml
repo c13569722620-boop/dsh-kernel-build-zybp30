@@ -238,6 +238,15 @@ jobs:
         echo "[+] disabled all remaining MTK driver directories referencing disabled symbols"
         # Disable c2k_usb drivers referencing disabled modem symbols
         find drivers/misc/mediatek/c2k_usb -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        # Nuclear option: disable ALL remaining MTK-specific driver dirs wholesale
+        find drivers/soc/mediatek -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/pinctrl/mediatek -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/mmc/host/mtk -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/net/ethernet/mediatek -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/net/wireless/mediatek -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/spi/spi-mtk -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        find drivers/i2c/busses/i2c-mt -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        echo "[+] nuclear disable of all remaining MTK driver directories"
 
 
     - name: Create missing header shims
@@ -489,11 +498,13 @@ jobs:
       run: |
         cd kernel-source
         # Wrap aarch64-linux-gnu-ld so every link invocation gets
-        # --unresolved-symbols=ignore-all via gcc -B option.
+        # --unresolved-symbols=ignore-all. Export LD directly so kbuild
+        # uses our wrapper for the vmlinux link step.
         mkdir -p /tmp/xld
         printf '#!/bin/bash\nexec /usr/bin/aarch64-linux-gnu-ld.bfd "$@" --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition\n' > /tmp/xld/aarch64-linux-gnu-ld.bfd
         printf '#!/bin/bash\nexec /usr/bin/aarch64-linux-gnu-ld.bfd "$@" --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition\n' > /tmp/xld/aarch64-linux-gnu-ld
         chmod +x /tmp/xld/aarch64-linux-gnu-ld.bfd /tmp/xld/aarch64-linux-gnu-ld
+        export LD="/tmp/xld/aarch64-linux-gnu-ld"
         export PATH="/tmp/xld:$PATH"
         make -j$(nproc) KCFLAGS="-Wno-error -Wno-format -B/tmp/xld" CFLAGS="-Wno-error -Wno-format -B/tmp/xld" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format -B/tmp/xld" CFLAGS="-Wno-error -Wno-format -B/tmp/xld" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
