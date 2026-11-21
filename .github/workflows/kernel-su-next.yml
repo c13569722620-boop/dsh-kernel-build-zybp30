@@ -361,6 +361,17 @@ jobs:
         KSU_STUB int pmic_auxadc_init(void) { return 0; }
         KSU_STUB unsigned int pmic_auxadc_read_channel(void) { return 0; }
 
+        /* MTK battery/charger symbols from disabled drivers */
+        KSU_STUB int register_battery_percent_notify(void) { return 0; }
+        KSU_STUB int register_battery_oc_notify(void) { return 0; }
+        KSU_STUB int charger_manager_enable_high_voltage_charging(void) { return 0; }
+        KSU_STUB void *charger_manager_get_by_name(void) { return NULL; }
+        KSU_STUB int modem_dcd_state(void) { return 0; }
+        KSU_STUB int modem_dtr_set(void) { return 0; }
+
+        /* MTK touch tracepoint */
+        KSU_STUB void __tracepoint_MET_touch(void) { }
+
         /* KernelSU compat (sucompat.c removed due to 4.19 incompat) */
         KSU_STUB int ksu_sucompat_init(void) { return 0; }
         KSU_STUB void ksu_sucompat_exit(void) { }
