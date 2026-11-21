@@ -398,10 +398,10 @@ jobs:
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
-        # Force --unresolved-symbols=ignore-all into the vmlinux link by
-        # patching the top-level Makefile's LDFLAGS_vmlinux directly.
-        sed -i 's/^LDFLAGS_vmlinux.*/& -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition/' Makefile
-        grep 'LDFLAGS_vmlinux' Makefile | head -3
+        # Patch link-vmlinux.sh to add unresolved-symbols=ignore-all to the
+        # vmlinux link command, catching any remaining MTK driver
+        # cross-references from disabled drivers.
+        sed -i 's/^LD$LDFLAGS/& --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition/' scripts/link-vmlinux.sh
         make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
 
