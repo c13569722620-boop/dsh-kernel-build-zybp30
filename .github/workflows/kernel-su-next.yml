@@ -492,12 +492,13 @@ jobs:
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
-        # Directly patch link-vmlinux.sh to add unresolved-symbols=ignore-all
-        # to the actual vmlinux link command line. This is the most reliable
-        # way to prevent remaining MTK driver cross-references from failing
-        # the build. Stubs cover known symbols; this catches anything left.
-        sed -i 's/\$LD \$LDFLAGS/\$LD \$LDFLAGS -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition/' scripts/link-vmlinux.sh
-        grep 'unresolved-symbols' scripts/link-vmlinux.sh | head -2 || true
+        # Wrap aarch64-linux-gnu-ld so every link invocation gets
+        # --unresolved-symbols=ignore-all, avoiding endless whack-a-mole
+        # with disabled MTK driver cross-references.
+        mkdir -p /tmp/xld
+        printf '#!/bin/bash\nexec /usr/bin/aarch64-linux-gnu-ld "$@" --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition\n' > /tmp/xld/aarch64-linux-gnu-ld
+        chmod +x /tmp/xld/aarch64-linux-gnu-ld
+        export PATH="/tmp/xld:$PATH"
         make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
 
