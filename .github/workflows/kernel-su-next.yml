@@ -391,10 +391,8 @@ jobs:
         # with disabled MTK driver cross-references. Stubs already cover known
         # symbols; --unresolved-symbols=ignore-all lets the linker finish for any
         # remaining references from drivers we could not disable.
-        make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" \
-          LDFLAGS="-Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition" \
-          Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" \
-          LDFLAGS="-Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition" Image
+        echo 'KBUILD_LDFLAGS += -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition' >> Makefile
+        make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
 
     - name: Repack boot image (kernel swap, keep ramdisk/dtb/cmdline)
