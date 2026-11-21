@@ -226,12 +226,8 @@ jobs:
         find drivers/misc/mediatek/usb20 -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/misc/mediatek/typec -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/misc/mediatek/video -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        # Disable additional drivers that reference symbols from disabled MTK drivers
-        find drivers/media/platform/mtk-vcodec -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/media/platform/mtk-vcu -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/input/fingerprint -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/gpu/drm/mediatek -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        find drivers/misc/mediatek/mtk_disp_mgr -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
+        # Disable ALL remaining MTK camera ISP subdirectories
+        find drivers/misc/mediatek/cameraisp -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         # Disable ALL remaining MTK misc drivers that could reference disabled symbols
         find drivers/misc/mediatek -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         # Disable all remaining MTK power/battery/charger drivers
@@ -239,9 +235,9 @@ jobs:
         # Disable all remaining input drivers (touchscreen references tracepoints from disabled drivers)
         find drivers/input/touchscreen -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         find drivers/input/keyboard/mediatek -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
-        # Disable c2k/usb drivers referencing disabled modem symbols
-        find drivers/misc/mediatek/c2k_usb -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
         echo "[+] disabled all remaining MTK driver directories referencing disabled symbols"
+        # Disable c2k_usb drivers referencing disabled modem symbols
+        find drivers/misc/mediatek/c2k_usb -name '*.c' -exec sh -c 'echo "/* disabled */" > "$1"' _ {} \; 2>/dev/null || true
 
 
     - name: Create missing header shims
@@ -496,8 +492,9 @@ jobs:
         # --unresolved-symbols=ignore-all, avoiding endless whack-a-mole
         # with disabled MTK driver cross-references.
         mkdir -p /tmp/xld
+        printf '#!/bin/bash\nexec /usr/bin/aarch64-linux-gnu-ld.bfd "$@" --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition\n' > /tmp/xld/aarch64-linux-gnu-ld.bfd
         printf '#!/bin/bash\nexec /usr/bin/aarch64-linux-gnu-ld "$@" --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition\n' > /tmp/xld/aarch64-linux-gnu-ld
-        chmod +x /tmp/xld/aarch64-linux-gnu-ld
+        chmod +x /tmp/xld/aarch64-linux-gnu-ld.bfd /tmp/xld/aarch64-linux-gnu-ld
         export PATH="/tmp/xld:$PATH"
         make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
