@@ -387,11 +387,11 @@ jobs:
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
-        # Allow unresolved symbols at link time to avoid endless whack-a-mole
-        # with disabled MTK driver cross-references. Stubs already cover known
-        # symbols; --unresolved-symbols=ignore-all lets the linker finish for any
-        # remaining references from drivers we could not disable.
-        echo 'KBUILD_LDFLAGS += -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition' >> Makefile
+        # Force unresolved-symbols=ignore-all into the vmlinux link step via
+        # LDFLAGS_vmlinux so remaining MTK driver cross-references don't block
+        # the build. Stubs already cover known symbols; this just lets the
+        # linker finish for anything left.
+        echo 'LDFLAGS_vmlinux += -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition' >> arch/arm64/Makefile
         make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format" CFLAGS="-Wno-error -Wno-format" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
 
