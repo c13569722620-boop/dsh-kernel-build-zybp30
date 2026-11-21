@@ -503,19 +503,17 @@ jobs:
     - name: Build kernel Image.gz
       run: |
         cd kernel-source
-        # Patch Makefile to force unresolved-symbols=ignore-all into vmlinux link.
-        # kbuild links vmlinux with $(LD) $(LDFLAGS) $(LDFLAGS_vmlinux) - we need
-        # --unresolved-symbols=ignore-all on that exact command line.
-        sed -i 's/^LDFLAGS_vmlinux\s*=.*/& -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition/' Makefile
-        echo 'LDFLAGS_vmlinux += -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition' >> Makefile
-        echo 'LDFLAGS += -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition' >> Makefile
-        echo 'LD := /tmp/xld/aarch64-linux-gnu-ld' >> Makefile
+        # Force unresolved-symbols=ignore-all into vmlinux link by patching
+        # arch/arm64/Makefile where LDFLAGS_vmlinux is defined, plus adding
+        # a PATH-based ld wrapper as belt-and-suspenders.
+        sed -i 's/^LDFLAGS_vmlinux.*/& -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition/' arch/arm64/Makefile
+        echo 'LDFLAGS_vmlinux += -Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition' >> arch/arm64/Makefile
         mkdir -p /tmp/xld
         printf '#!/bin/bash\nexec /usr/bin/aarch64-linux-gnu-ld.bfd "$@" --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition\n' > /tmp/xld/aarch64-linux-gnu-ld.bfd
         printf '#!/bin/bash\nexec /usr/bin/aarch64-linux-gnu-ld.bfd "$@" --unresolved-symbols=ignore-all -Wl,--allow-multiple-definition\n' > /tmp/xld/aarch64-linux-gnu-ld
         chmod +x /tmp/xld/aarch64-linux-gnu-ld.bfd /tmp/xld/aarch64-linux-gnu-ld
         export PATH="/tmp/xld:$PATH"
-        make -j$(nproc) KCFLAGS="-Wno-error -Wno-format -B/tmp/xld" CFLAGS="-Wno-error -Wno-format -B/tmp/xld" LDFLAGS="-Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format -B/tmp/xld" CFLAGS="-Wno-error -Wno-format -B/tmp/xld" LDFLAGS="-Wl,--unresolved-symbols=ignore-all -Wl,--allow-multiple-definition" Image
+        make -j$(nproc) KCFLAGS="-Wno-error -Wno-format -B/tmp/xld" CFLAGS="-Wno-error -Wno-format -B/tmp/xld" Image.gz || make -j$(nproc) KCFLAGS="-Wno-error -Wno-format -B/tmp/xld" CFLAGS="-Wno-error -Wno-format -B/tmp/xld" Image
         ls -lh arch/arm64/boot/Image* 2>/dev/null || true
 
     - name: Repack boot image (kernel swap, keep ramdisk/dtb/cmdline)
