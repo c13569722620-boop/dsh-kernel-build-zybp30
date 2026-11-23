@@ -115,8 +115,12 @@ jobs:
         set -o pipefail
         export PATH="$HOME/clang-prebuilt/bin:$PATH"
         clang --version | head -2
+        # -Wunused-function: MTK vendor code has functions only used under
+        # configs that are off in this defconfig; clang -Werror rejects them.
+        # These are warning-level noise, not real defects.
         make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 \
           CROSS_COMPILE=aarch64-linux-gnu- \
+          KCFLAGS="-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable" \
           Image 2>&1 | tee build-image.log
         echo "=== done ==="
         ls -lh arch/arm64/boot/Image
@@ -129,7 +133,8 @@ jobs:
         export PATH="$HOME/clang-prebuilt/bin:$PATH"
         make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 \
           CROSS_COMPILE=aarch64-linux-gnu- \
-          modules 2>&1 | tail -60
+          KCFLAGS="-Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable" \
+          modules 2>&1 | tee build-modules.log | tail -60
         echo "--- ko count ---"
         find . -name '*.ko' -newermt '-2 hours' | wc -l
 
