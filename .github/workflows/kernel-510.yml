@@ -1,0 +1,112 @@
+name: Build MT6768 Linux 5.10 kernel for ZPD1203 (k69v1_64_k510)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_modules:
+        description: "Also build modules (*.ko)"
+        type: boolean
+        default: true
+
+env:
+  ARCH: arm64
+  KERNEL_REPO: https://github.com/LineageOS/android_kernel_xelex_mt6789.git
+  KERNEL_BRANCH: lineage-23.2
+  KERNEL_DEFCONFIG: k69v1_64_k510_defconfig
+  CLANG_REPO: https://github.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r416183b.git
+  CLANG_BRANCH: "11.0"
+
+jobs:
+  build:
+    # 5.10 MTK tree: use 22.04 (glibc older, prebuilt clang r416183b expects it)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    steps:
+    - name: Checkout builder repo
+      uses: actions/checkout@v4
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends \
+          build-essential bc bison flex libssl-dev libelf-dev git python3 \
+          libncurses-dev rsync kmod cpio wget xz-utils lz4 zstd \
+          gcc-aarch64-linux-gnu
+        sudo ln -sf /usr/bin/python3 /usr/bin/python
+        echo "--- host gcc ---"; gcc --version | head -1
+        echo "--- cross gcc ---"; aarch64-linux-gnu-gcc --version | head -1
+
+    - name: Fetch AOSP prebuilt clang r416183b (Android 12 / 5.10 era)
+      run: |
+        set -e
+        cd $HOME
+        echo "[+] cloning clang prebuilt (this is ~350MB)"
+        git clone --depth=1 -b "${{ env.CLANG_BRANCH }}" "${{ env.CLANG_REPO }}" clang-prebuilt
+        ls -l clang-prebuilt/bin/clang
+        $HOME/clang-prebuilt/bin/clang --version | head -3
+        echo "[ok] clang ready"
+
+    - name: Clone kernel source 5.10
+      run: |
+        set -e
+        git clone --depth=1 -b "${{ env.KERNEL_BRANCH }}" "${{ env.KERNEL_REPO }}" kernel-source
+        cd kernel-source
+        echo "--- version ---"
+        grep -E '^(VERSION|PATCHLEVEL|SUBLEVEL) =' Makefile
+        echo "--- defconfig ---"
+        ls -l arch/arm64/configs/${{ env.KERNEL_DEFCONFIG }}
+        echo "--- k69 dts ---"
+        ls -l arch/arm64/boot/dts/mediatek/k69v1_64_k510.dts
+
+    - name: Configure kernel (vanilla baseline)
+      run: |
+        set -e
+        cd kernel-source
+        export PATH="$HOME/clang-prebuilt/bin:$PATH"
+        make ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- \
+          ${{ env.KERNEL_DEFCONFIG }}
+        echo "--- key config ---"
+        grep -E 'CONFIG_MTK_PLAT_POWER_MT6768|CONFIG_KPROBES|CONFIG_MODULES|CONFIG_LOCALVERSION' .config || true
+        echo "--- ratio: =y $(grep -c '=y$' .config) / =m $(grep -c '=m$' .config) ---"
+
+    - name: Build kernel Image (baseline, no patches)
+      run: |
+        cd kernel-source
+        set -o pipefail
+        export PATH="$HOME/clang-prebuilt/bin:$PATH"
+        clang --version | head -2
+        make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          Image 2>&1 | tee build-image.log
+        echo "=== done ==="
+        ls -lh arch/arm64/boot/Image
+
+    - name: Build modules
+      if: ${{ inputs.build_modules }}
+      run: |
+        cd kernel-source
+        set -o pipefail
+        export PATH="$HOME/clang-prebuilt/bin:$PATH"
+        make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          modules 2>&1 | tail -60
+        echo "--- ko count ---"
+        find . -name '*.ko' -newermt '-2 hours' | wc -l
+
+    - name: Collect build log tail
+      if: always()
+      run: |
+        echo "=== build-image.log tail (120) ==="
+        tail -120 kernel-source/build-image.log 2>/dev/null || echo "(no log)"
+
+    - name: Upload artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-510-baseline
+        path: |
+          kernel-source/arch/arm64/boot/Image
+          kernel-source/build-image.log
+        retention-days: 7
+        if-no-files-found: warn
