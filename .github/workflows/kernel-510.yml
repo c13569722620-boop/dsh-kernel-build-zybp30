@@ -98,13 +98,46 @@ jobs:
         echo "--- verify fix2 ---"
         sed -n '2334,2345p' "$R"
 
-    - name: Configure kernel (vanilla baseline)
+        # Fix 3: clang rejects angled includes that contain relative ".." paths.
+        # MTK uses them in several files; convert "<../misc/...>" -> "../misc/...".
+        echo "[+] fix3: converting angled relative includes"
+        grep -rl --include='*.c' --include='*.h' -E '#include <\.\./' drivers/ 2>/dev/null | while read -r f; do
+          sed -i -E 's|#include <(\.\./[^>]+)>|#include "\1"|g' "$f"
+          echo "    patched $f"
+        done
+
+        # Fix 4: iommu_debug.h lives in drivers/misc/mediatek/iommu/ but does
+        # #include "mtk_iommu.h" which actually sits in drivers/iommu/.
+        # Point it at the real location.
+        IDBG=drivers/misc/mediatek/iommu/iommu_debug.h
+        if [ -f "$IDBG" ] && grep -q '#include "mtk_iommu\.h"' "$IDBG"; then
+          sed -i 's|#include "mtk_iommu\.h"|#include "../../../iommu/mtk_iommu.h"|' "$IDBG"
+          echo "[+] fix4: corrected mtk_iommu.h path in $IDBG"
+        fi
+        echo "--- verify fix4 ---"
+        grep -n 'mtk_iommu.h' "$IDBG" 2>/dev/null | head -3
+
+    - name: Configure kernel (vanilla baseline + required platform knobs)
       run: |
         set -e
         cd kernel-source
         export PATH="$HOME/clang-prebuilt/bin:$PATH"
         make ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- \
           ${{ env.KERNEL_DEFCONFIG }}
+
+        # This 5.10 tree is MTK's newer layout: display lives under
+        # drivers/gpu/drm/mediatek (CONFIG_DRM_MEDIATEK), there is no
+        # drivers/misc/mediatek/video/videox/* for mt6768. GED KPI picks its
+        # header via #if IS_ENABLED(CONFIG_DRM_MEDIATEK): the DRM branch
+        # (mtk_drm_arr.h) exists, the legacy branch (disp_arr.h) does not.
+        # Enable the DRM path so the build matches the actual tree.
+        ./scripts/config --enable DRM_MEDIATEK || true
+        ./scripts/config --enable DRM || true
+        make olddefconfig
+        echo "--- confirm ---"
+        grep -E 'CONFIG_DRM_MEDIATEK|CONFIG_DRM=' .config || true
+        echo "--- key platform ---"
+        grep -E 'CONFIG_MTK_PLAT_POWER_MT6768|CONFIG_KPROBES|CONFIG_MODULES' .config || true
         echo "--- key config ---"
         grep -E 'CONFIG_MTK_PLAT_POWER_MT6768|CONFIG_KPROBES|CONFIG_MODULES|CONFIG_LOCALVERSION' .config || true
         echo "--- ratio: =y $(grep -c '=y$' .config) / =m $(grep -c '=m$' .config) ---"
@@ -120,7 +153,7 @@ jobs:
         # These are warning-level noise, not real defects.
         make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 \
           CROSS_COMPILE=aarch64-linux-gnu- \
-          KCFLAGS="-Wno-unused-function -Wno-unused-variable" \
+          KCFLAGS="-Wno-unused-function -Wno-unused-variable -Wno-unused-result" \
           Image 2>&1 | tee build-image.log
         echo "=== done ==="
         ls -lh arch/arm64/boot/Image
@@ -133,7 +166,7 @@ jobs:
         export PATH="$HOME/clang-prebuilt/bin:$PATH"
         make -j$(nproc) ARCH=arm64 LLVM=1 LLVM_IAS=1 \
           CROSS_COMPILE=aarch64-linux-gnu- \
-          KCFLAGS="-Wno-unused-function -Wno-unused-variable" \
+          KCFLAGS="-Wno-unused-function -Wno-unused-variable -Wno-unused-result" \
           modules 2>&1 | tee build-modules.log | tail -60
         echo "--- ko count ---"
         find . -name '*.ko' -newermt '-2 hours' | wc -l
