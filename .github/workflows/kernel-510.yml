@@ -59,6 +59,21 @@ jobs:
         echo "--- k69 dts ---"
         ls -l arch/arm64/boot/dts/mediatek/k69v1_64_k510.dts
 
+    - name: Apply minimal build fixes
+      run: |
+        set -e
+        cd kernel-source
+        # MTK's pinctrl debug file uses <../../gpio/gpiolib.h> which clang rejects
+        # ("file not found with <angled> include; use quotes instead").
+        # Switch it to quoted form so the relative path resolves.
+        FILE=drivers/pinctrl/mediatek/pinctrl-mtk-common-v2_debug.c
+        if grep -q '#include <\.\./\.\./gpio/gpiolib\.h>' "$FILE"; then
+          sed -i 's|#include <\.\./\.\./gpio/gpiolib\.h>|#include "../../gpio/gpiolib.h"|' "$FILE"
+          echo "[+] fixed angled include in $FILE"
+        fi
+        echo "--- verify ---"
+        sed -n '9,20p' "$FILE"
+
     - name: Configure kernel (vanilla baseline)
       run: |
         set -e
@@ -99,6 +114,10 @@ jobs:
       run: |
         echo "=== build-image.log tail (120) ==="
         tail -120 kernel-source/build-image.log 2>/dev/null || echo "(no log)"
+        echo ""
+        echo "=== unique error lines ==="
+        grep -oE '(error:|Error [0-9])[^|]*' kernel-source/build-image.log 2>/dev/null \
+          | sed 's/\x1b\[[0-9;]*m//g' | sort -u | head -40 || true
 
     - name: Upload artifacts
       if: always()
