@@ -117,6 +117,21 @@ jobs:
         echo "--- verify fix4 ---"
         grep -n 'mtk_iommu.h' "$IDBG" 2>/dev/null | head -3
 
+        # Fix 5: TRACE_SYSTEM headers (define_trace.h) resolve the include
+        # relative to the object's build dir, so "mtk_layer_layout_trace.h"
+        # must be reachable via -I or be present next to the .o.
+        # The header exists in drivers/gpu/drm/mediatek/mediatek_v2/.
+        LAYDIR=drivers/gpu/drm/mediatek/mediatek_v2
+        if [ -f "$LAYDIR/mtk_layer_layout_trace.h" ]; then
+          echo "[+] fix5: trace header present in $LAYDIR"
+          # make it visible to define_trace.h's relative lookup
+          if [ -f "$LAYDIR/Makefile" ]; then
+            grep -q 'mtk_layer_layout_trace' "$LAYDIR/Makefile" || \
+              echo 'ccflags-y += -I$(srctree)/$(src)' >> "$LAYDIR/Makefile"
+            echo "    added -I to $LAYDIR/Makefile"
+          fi
+        fi
+
     - name: Configure kernel (vanilla baseline + required platform knobs)
       run: |
         set -e
@@ -125,17 +140,23 @@ jobs:
         make ARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- \
           ${{ env.KERNEL_DEFCONFIG }}
 
-        # This 5.10 tree is MTK's newer layout: display lives under
-        # drivers/gpu/drm/mediatek (CONFIG_DRM_MEDIATEK), there is no
-        # drivers/misc/mediatek/video/videox/* for mt6768. GED KPI picks its
-        # header via #if IS_ENABLED(CONFIG_DRM_MEDIATEK): the DRM branch
-        # (mtk_drm_arr.h) exists, the legacy branch (disp_arr.h) does not.
-        # Enable the DRM path so the build matches the actual tree.
+        # Required platform knobs for this MTK 5.10 tree
+        # DEVFREQ simple_ondemand: ufshcd.h references
+        #   struct devfreq_simple_ondemand_data; without the governor the
+        #   type is incomplete.
+        ./scripts/config --enable DEVFREQ_GOV_SIMPLE_ONDEMAND || true
+        ./scripts/config --enable PM_DEVFREQ || true
+        # cpufreq_frequency_table_target() is declared in
+        # <linux/cpufreq.h> only when CPU_FREQ is on; cm_mgr uses it.
+        ./scripts/config --enable CPU_FREQ || true
+        ./scripts/config --enable CPU_FREQ_GOV_COMMON || true
+        ./scripts/config --enable CPU_FREQ_DEFAULT_GOV_SCHEDUTIL || true
+        # Re-enable DRM path (see disp_arr.h note above) with its deps
         ./scripts/config --enable DRM_MEDIATEK || true
         ./scripts/config --enable DRM || true
         make olddefconfig
         echo "--- confirm ---"
-        grep -E 'CONFIG_DRM_MEDIATEK|CONFIG_DRM=' .config || true
+        grep -E 'CONFIG_DRM_MEDIATEK|CONFIG_DRM=|CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND|CONFIG_CPU_FREQ=' .config || true
         echo "--- key platform ---"
         grep -E 'CONFIG_MTK_PLAT_POWER_MT6768|CONFIG_KPROBES|CONFIG_MODULES' .config || true
         echo "--- key config ---"
