@@ -63,16 +63,40 @@ jobs:
       run: |
         set -e
         cd kernel-source
-        # MTK's pinctrl debug file uses <../../gpio/gpiolib.h> which clang rejects
+
+        # Fix 1: MTK pinctrl debug uses <../../gpio/gpiolib.h> which clang rejects
         # ("file not found with <angled> include; use quotes instead").
-        # Switch it to quoted form so the relative path resolves.
         FILE=drivers/pinctrl/mediatek/pinctrl-mtk-common-v2_debug.c
         if grep -q '#include <\.\./\.\./gpio/gpiolib\.h>' "$FILE"; then
           sed -i 's|#include <\.\./\.\./gpio/gpiolib\.h>|#include "../../gpio/gpiolib.h"|' "$FILE"
-          echo "[+] fixed angled include in $FILE"
+          echo "[+] fix1: angled include in $FILE"
         fi
-        echo "--- verify ---"
-        sed -n '9,20p' "$FILE"
+
+        # Fix 2: rpmb-mtk.c declares "struct mmc_host *mmc = mtk_mmc_host[0];"
+        # unconditionally inside rpmb_gp_listenDci(), but mtk_mmc_host[] only
+        # exists under CONFIG_MMC_MTK_PRO. Both configs are =m (different
+        # modules), so the symbol is unavailable -> "use of undeclared
+        # identifier 'mtk_mmc_host'". Guard the declaration to match its use.
+        R=drivers/char/rpmb/rpmb-mtk.c
+        python3 - "$R" <<'PYEOF'
+        import sys
+        p = sys.argv[1]
+        src = open(p, encoding='utf-8', errors='replace').read()
+        old = "\tu32 cmdId;\n\tstruct mmc_host *mmc = mtk_mmc_host[0];\n"
+        new = ("\tu32 cmdId;\n"
+               "#if IS_ENABLED(CONFIG_MMC_MTK_PRO)\n"
+               "\tstruct mmc_host *mmc = mtk_mmc_host[0];\n"
+               "#endif\n")
+        if old in src:
+            src = src.replace(old, new, 1)
+            open(p, 'w', encoding='utf-8').write(src)
+            print("[+] fix2: guarded mtk_mmc_host declaration in rpmb-mtk.c")
+        else:
+            print("[!] fix2: pattern not found (already patched?)")
+        PYEOF
+
+        echo "--- verify fix2 ---"
+        sed -n '2334,2345p' "$R"
 
     - name: Configure kernel (vanilla baseline)
       run: |
