@@ -92,6 +92,21 @@ jobs:
         test -f firmware/zpd1203/Himax_firmware_e.bin || { echo "missing Himax_firmware_e.bin"; exit 1; }
         echo "[ok] both firmware blobs present"
 
+    - name: Apply minimal build fix (clang angled include)
+      run: |
+        set -e
+        cd kernel-source
+        # MTK pinctrl debug uses <../../gpio/gpiolib.h>; clang rejects angled
+        # includes containing relative ".." paths. Switch to quoted form.
+        FILE=drivers/pinctrl/mediatek/pinctrl-mtk-common-v2_debug.c
+        if grep -q '#include <\.\./\.\./gpio/gpiolib\.h>' "$FILE"; then
+          sed -i 's|#include <\.\./\.\./gpio/gpiolib\.h>|#include "../../gpio/gpiolib.h"|' "$FILE"
+          echo "[+] patched angled include in $FILE"
+        else
+          echo "[i] pattern not present (already OK?)"
+        fi
+        sed -n '9,20p' "$FILE"
+
     - name: Configure kernel
       run: |
         set -e
