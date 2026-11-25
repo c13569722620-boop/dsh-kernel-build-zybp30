@@ -1,0 +1,146 @@
+name: Build ZPD1203 Linux 5.10.240 kernel (KernelSU v3.3.1)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_wireless:
+        description: "Also build wireless modules (.ko)"
+        type: boolean
+        default: false
+
+env:
+  # Authoritative source: already ported to MT6768/ZPD1203, includes KernelSU
+  KERNEL_REPO: https://github.com/idkwhatismyname123/zpd1203-5.10.240.git
+  KERNEL_BRANCH: main
+  DEFCONFIG: zpd1203_test25_defconfig
+  KSU_COMMIT: 0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 240
+
+    steps:
+    - name: Checkout builder repo
+      uses: actions/checkout@v4
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends \
+          build-essential bc bison flex libssl-dev libelf-dev git python3 \
+          libncurses-dev rsync kmod cpio wget xz-utils lz4 zstd \
+          gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+          fakeroot device-tree-compiler
+        sudo ln -sf /usr/bin/python3 /usr/bin/python
+        echo "--- versions ---"
+        gcc --version | head -1
+        aarch64-linux-gnu-gcc --version | head -1
+
+    # README specifies Clang 21.1.8 was used for the verified build.
+    - name: Fetch Clang 21.1.8
+      run: |
+        set -e
+        mkdir -p $HOME/tc && cd $HOME/tc
+        URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-Linux-X64.tar.xz"
+        echo "[+] downloading Clang 21.1.8 (~2GB)"
+        curl -fL --retry 3 --retry-delay 5 "$URL" -o llvm.tar.xz
+        ls -lh llvm.tar.xz
+        tar -xJf llvm.tar.xz
+        DIR=$(find . -maxdepth 1 -type d -name 'LLVM-21.1.8*' | head -1)
+        echo "[+] extracted: $DIR"
+        echo "CLANG_DIR=$PWD/$DIR/bin" >> $GITHUB_ENV
+        "$PWD/$DIR/bin/clang" --version | head -3
+        ls "$PWD/$DIR/bin" | grep -E '^(clang|ld.lld|llvm-ar)$'
+
+    - name: Clone kernel source (with KernelSU submodule)
+      run: |
+        set -e
+        git clone --depth=1 -b "${{ env.KERNEL_BRANCH }}" "${{ env.KERNEL_REPO }}" kernel-source
+        cd kernel-source
+        echo "--- kernel version ---"
+        grep -E '^(VERSION|PATCHLEVEL|SUBLEVEL) =' Makefile
+        echo "--- defconfig ---"
+        ls -l arch/arm64/configs/${{ env.DEFCONFIG }}
+        echo "--- init submodule (KernelSU) ---"
+        git submodule update --init --depth=1 external/KernelSU || {
+          echo "[!] submodule init failed, cloning pinned KernelSU"
+          rm -rf external/KernelSU
+          git clone https://github.com/tiann/KernelSU.git external/KernelSU
+          cd external/KernelSU && git checkout ${{ env.KSU_COMMIT }} && cd ../..
+        }
+        ls -l drivers/kernelsu/Kconfig && echo "[ok] KernelSU present"
+        git -C external/KernelSU rev-parse HEAD
+
+    - name: Place Himax firmware
+      run: |
+        set -e
+        cd kernel-source
+        mkdir -p firmware/zpd1203
+        cp "${{ github.workspace }}/firmware/Himax_firmware.bin" firmware/zpd1203/
+        cp "${{ github.workspace }}/firmware/Himax_firmware_e.bin" firmware/zpd1203/
+        ls -l firmware/zpd1203/
+        echo "--- md5 ---"
+        md5sum firmware/zpd1203/*
+        echo "[ok] Himax firmware in place (required by CONFIG_EXTRA_FIRMWARE)"
+
+    - name: Verify firmware files exist
+      run: |
+        set -e
+        cd kernel-source
+        test -f firmware/zpd1203/Himax_firmware.bin || { echo "missing Himax_firmware.bin"; exit 1; }
+        test -f firmware/zpd1203/Himax_firmware_e.bin || { echo "missing Himax_firmware_e.bin"; exit 1; }
+        echo "[ok] both firmware blobs present"
+
+    - name: Configure kernel
+      run: |
+        set -e
+        cd kernel-source
+        export PATH="$CLANG_DIR:$PATH"
+        make ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+          LOCALVERSION= \
+          ${{ env.DEFCONFIG }}
+        echo "--- key configs ---"
+        grep -E 'CONFIG_KSU=|CONFIG_EXTRA_FIRMWARE|CONFIG_LOCALVERSION=|CONFIG_TOUCHSCREEN_HIMAX_IC_HX83102|CONFIG_MTK_PLAT_POWER_MT6768' .config || true
+        echo "--- module ratio: =y $(grep -c '=y$' .config) / =m $(grep -c '=m$' .config) ---"
+
+    - name: Build kernel Image.gz + DTB
+      run: |
+        cd kernel-source
+        set -o pipefail
+        export PATH="$CLANG_DIR:$PATH"
+        clang --version | head -2
+        # KCFLAGS copied verbatim from the upstream build-kernel.sh
+        make ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+          CROSS_COMPILE=aarch64-linux-gnu- \
+          CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+          LOCALVERSION= \
+          KCFLAGS="-Wno-error -Wno-unused-but-set-variable -Wno-array-bounds -Wno-misleading-indentation -Wno-format -Wno-enum-conversion -Wno-gnu-variable-sized-type-not-at-end -Wno-unaligned-access -Wno-strict-prototypes" \
+          -j$(nproc) \
+          Image.gz mediatek/mt6768-zpd1203-minimal.dtb 2>&1 | tee build.log
+        echo "=== artifacts ==="
+        ls -lh arch/arm64/boot/Image.gz
+        ls -lh arch/arm64/boot/dts/mediatek/mt6768-zpd1203-minimal.dtb
+
+    - name: Show errors on failure
+      if: failure()
+      run: |
+        echo "=== unique error lines ==="
+        sed 's/\x1b\[[0-9;]*m//g' kernel-source/build.log 2>/dev/null \
+          | grep -E '(error:|Error [0-9]|fatal error)' | sort -u | head -40 || echo "(no build.log)"
+        echo "=== tail ==="
+        tail -80 kernel-source/build.log 2>/dev/null || true
+
+    - name: Upload kernel artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-510.240-zpd1203
+        path: |
+          kernel-source/arch/arm64/boot/Image.gz
+          kernel-source/arch/arm64/boot/dts/mediatek/mt6768-zpd1203-minimal.dtb
+          kernel-source/build.log
+        retention-days: 14
+        if-no-files-found: warn
