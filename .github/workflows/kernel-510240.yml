@@ -92,20 +92,39 @@ jobs:
         test -f firmware/zpd1203/Himax_firmware_e.bin || { echo "missing Himax_firmware_e.bin"; exit 1; }
         echo "[ok] both firmware blobs present"
 
-    - name: Apply minimal build fix (clang angled include)
+    - name: Apply minimal build fixes (clang include hygiene)
       run: |
         set -e
         cd kernel-source
-        # MTK pinctrl debug uses <../../gpio/gpiolib.h>; clang rejects angled
-        # includes containing relative ".." paths. Switch to quoted form.
-        FILE=drivers/pinctrl/mediatek/pinctrl-mtk-common-v2_debug.c
-        if grep -q '#include <\.\./\.\./gpio/gpiolib\.h>' "$FILE"; then
-          sed -i 's|#include <\.\./\.\./gpio/gpiolib\.h>|#include "../../gpio/gpiolib.h"|' "$FILE"
-          echo "[+] patched angled include in $FILE"
-        else
-          echo "[i] pattern not present (already OK?)"
+
+        # Fix A: MTK pinctrl debug uses <../../gpio/gpiolib.h>; clang rejects
+        # angled includes that contain relative ".." segments.
+        echo "[+] Fix A: angled relative includes"
+        grep -rl --include='*.c' --include='*.h' -E '#include <\.\./' drivers/ 2>/dev/null | while read -r f; do
+          sed -i -E 's|#include <(\.\./[^>]+)>|#include "\1"|g' "$f"
+          echo "    patched $f"
+        done
+
+        # Fix B: musb_main.h lives in usb20/musb_main/ but the Makefile only
+        # adds -I usb20/ (its parent), so <musb_main.h> is not found.
+        # Give each subdir its own -I via $(src).
+        MUSBDIR=drivers/misc/mediatek/usb20/musb_main
+        if [ -f "$MUSBDIR/Makefile" ]; then
+          grep -q '\-I$(srctree)/$(src)' "$MUSBDIR/Makefile" || \
+            echo 'ccflags-y += -I$(srctree)/$(src)' >> "$MUSBDIR/Makefile"
+          echo "[+] Fix B: added -I\$(src) to $MUSBDIR/Makefile"
         fi
-        sed -n '9,20p' "$FILE"
+
+        # Fix C: belt-and-suspenders — add -I$(srctree)/$(src) to every MTK
+        # Makefile that lacks it, so local headers resolve under clang.
+        find drivers/misc/mediatek -name Makefile 2>/dev/null | while read -r mf; do
+          grep -q '\-I$(srctree)/$(src)' "$mf" || \
+            echo 'ccflags-y += -I$(srctree)/$(src)' >> "$mf"
+        done
+        echo "[+] Fix C: ensured -I\$(src) in drivers/misc/mediatek Makefiles"
+
+        echo "--- verify ---"
+        tail -3 "$MUSBDIR/Makefile"
 
     - name: Configure kernel
       run: |
