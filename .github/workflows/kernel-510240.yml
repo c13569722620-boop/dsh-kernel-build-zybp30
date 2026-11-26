@@ -105,26 +105,28 @@ jobs:
           echo "    patched $f"
         done
 
-        # Fix B: musb_main.h lives in usb20/musb_main/ but the Makefile only
-        # adds -I usb20/ (its parent), so <musb_main.h> is not found.
-        # Give each subdir its own -I via $(src).
-        MUSBDIR=drivers/misc/mediatek/usb20/musb_main
-        if [ -f "$MUSBDIR/Makefile" ]; then
-          grep -q '\-I$(srctree)/$(src)' "$MUSBDIR/Makefile" || \
-            echo 'ccflags-y += -I$(srctree)/$(src)' >> "$MUSBDIR/Makefile"
-          echo "[+] Fix B: added -I\$(src) to $MUSBDIR/Makefile"
-        fi
+        # Fix B: musb_main.h lives in usb20/musb_main/ but its Makefile only
+        # adds -I usb20/ (the parent), so <musb_main.h> is not found.
+        # Handled by Fix C below (adds -I$(srctree)/$(src) to that dir).
 
-        # Fix C: belt-and-suspenders — add -I$(srctree)/$(src) to every MTK
-        # Makefile that lacks it, so local headers resolve under clang.
-        find drivers/misc/mediatek -name Makefile 2>/dev/null | while read -r mf; do
-          grep -q '\-I$(srctree)/$(src)' "$mf" || \
-            echo 'ccflags-y += -I$(srctree)/$(src)' >> "$mf"
+        # Fix C: add -I$(src) ONLY to Makefiles that need it (headers sitting
+        # next to sources but not on any -I path). A blanket append breaks
+        # Makefiles whose last line is "endif" without a trailing newline
+        # (e.g. sensors-1.0/situation), so patch targeted dirs explicitly.
+        for d in \
+            drivers/misc/mediatek/usb20/musb_main \
+            ; do
+          mf="$d/Makefile"
+          [ -f "$mf" ] || continue
+          grep -q '\-I$(srctree)/$(src)' "$mf" && continue
+          # ensure file ends with newline before appending
+          [ -n "$(tail -c1 "$mf")" ] && echo "" >> "$mf"
+          echo 'ccflags-y += -I$(srctree)/$(src)' >> "$mf"
+          echo "[+] Fix C: added -I\$(src) to $mf"
         done
-        echo "[+] Fix C: ensured -I\$(src) in drivers/misc/mediatek Makefiles"
 
-        echo "--- verify ---"
-        tail -3 "$MUSBDIR/Makefile"
+        echo "--- verify musb Makefile (must end with ccflags line) ---"
+        tail -3 drivers/misc/mediatek/usb20/musb_main/Makefile
 
     - name: Configure kernel
       run: |
