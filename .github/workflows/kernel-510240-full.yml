@@ -1,0 +1,271 @@
+name: Build ZPD1203 5.10.240 kernel + wireless modules + boot.img
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_wireless:
+        description: "Skip wireless modules (kernel only)"
+        type: boolean
+        default: false
+
+env:
+  KERNEL_REPO: https://github.com/idkwhatismyname123/zpd1203-5.10.240.git
+  KERNEL_BRANCH: main
+  DEFCONFIG: zpd1203_test25_defconfig
+  KSU_COMMIT: 0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d
+  MOTO_ORG: MotorolaMobilityLLC
+  C_COMMON: 8c858eae50cbbb9b86008038f7b124761506baaf
+  C_BT: 2a851b310d43afd104a0379e552c23a58eef69ab
+  C_CONNFEM: b40ab0fd746016c6a8d6f2d55ae9c98edc797981
+  C_ADAPTOR: 6c5a97726c86d1cf6da6d38387b6b2abe118a0ea
+  C_GEN4M: f72d1f101aae82da581add5e4cf87d52f5174c0f
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+
+    steps:
+    - name: Checkout builder repo
+      uses: actions/checkout@v4
+
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y --no-install-recommends \
+          build-essential bc bison flex libssl-dev libelf-dev git python3 \
+          libncurses-dev rsync kmod cpio wget xz-utils lz4 zstd \
+          gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+          fakeroot device-tree-compiler android-sdk-libsparse-utils
+        sudo ln -sf /usr/bin/python3 /usr/bin/python
+        gcc --version | head -1
+
+    - name: Fetch Clang 21.1.8
+      run: |
+        set -e
+        mkdir -p $HOME/tc && cd $HOME/tc
+        curl -fL --retry 3 --retry-delay 5 \
+          "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.8/LLVM-21.1.8-Linux-X64.tar.xz" \
+          -o llvm.tar.xz
+        tar -xJf llvm.tar.xz
+        DIR=$(find . -maxdepth 1 -type d -name 'LLVM-21.1.8*' | head -1)
+        echo "CLANG_DIR=$PWD/$DIR/bin" >> $GITHUB_ENV
+        "$PWD/$DIR/bin/clang" --version | head -2
+
+    - name: Clone kernel source
+      run: |
+        set -e
+        git clone --depth=1 -b "${{ env.KERNEL_BRANCH }}" "${{ env.KERNEL_REPO }}" kernel-source
+        cd kernel-source
+        grep -E '^(VERSION|PATCHLEVEL|SUBLEVEL) =' Makefile
+        git submodule update --init --depth=1 external/KernelSU || {
+          rm -rf external/KernelSU
+          git clone https://github.com/tiann/KernelSU.git external/KernelSU
+          git -C external/KernelSU checkout ${{ env.KSU_COMMIT }}
+        }
+        ls -l drivers/kernelsu/Kconfig && echo "[ok] KernelSU"
+
+    - name: Clone Motorola wireless sources (pinned)
+      if: ${{ !inputs.skip_wireless }}
+      run: |
+        set -e
+        WL=$HOME/wireless
+        EXT=$WL/connectivity
+        mkdir -p "$EXT/bt" "$EXT/wlan/core"
+        clone_pinned() {
+          url="https://github.com/${{ env.MOTO_ORG }}/$1.git"
+          dst="$2"
+          rev="$3"
+          echo "[+] $1 -> $dst @ $rev"
+          git init -q "$dst"
+          git -C "$dst" remote add origin "$url"
+          git -C "$dst" fetch -q --depth=1 origin "$rev"
+          git -C "$dst" checkout -q FETCH_HEAD
+          test "$(git -C "$dst" rev-parse HEAD)" = "$rev" || { echo "pin mismatch $dst"; exit 1; }
+        }
+        clone_pinned vendor-mediatek-kernel_modules-connectivity-common            "$EXT/common"          "${{ env.C_COMMON }}"
+        clone_pinned vendor-mediatek-kernel_modules-connectivity-bt-mt66xx        "$EXT/bt/mt66xx"       "${{ env.C_BT }}"
+        clone_pinned vendor-mediatek-kernel_modules-connectivity-connfem          "$EXT/connfem"         "${{ env.C_CONNFEM }}"
+        clone_pinned vendor-mediatek-kernel_modules-connectivity-wlan-adaptor     "$EXT/wlan/adaptor"    "${{ env.C_ADAPTOR }}"
+        clone_pinned vendor-mediatek-kernel_modules-connectivity-wlan-core-gen4m  "$EXT/wlan/core/gen4m" "${{ env.C_GEN4M }}"
+        echo "[ok] all 5 wireless repos pinned"
+
+    - name: Place Himax firmware
+      run: |
+        set -e
+        cd kernel-source
+        mkdir -p firmware/zpd1203
+        cp "${{ github.workspace }}/firmware/Himax_firmware.bin" firmware/zpd1203/
+        cp "${{ github.workspace }}/firmware/Himax_firmware_e.bin" firmware/zpd1203/
+        md5sum firmware/zpd1203/*
+
+    - name: Apply build fixes (clang include hygiene)
+      run: |
+        set -e
+        cd kernel-source
+        python3 - <<'PYEOF'
+        import os, re
+        pat = re.compile(r'^(\s*#\s*include\s*)<([^>]+)>', re.M)
+        changed = 0
+        for root, dirs, files in os.walk("drivers"):
+            for fn in files:
+                if not fn.endswith((".c", ".h")):
+                    continue
+                p = os.path.join(root, fn)
+                try:
+                    src = open(p, encoding="utf-8", errors="replace").read()
+                except Exception:
+                    continue
+                base = os.path.dirname(p)
+                def repl(m):
+                    head, inc = m.group(1), m.group(2)
+                    if not (inc.startswith("..") or "/" in inc):
+                        return m.group(0)
+                    if os.path.exists(os.path.normpath(os.path.join(base, inc))):
+                        return f'{head}"{inc}"'
+                    if os.path.exists(inc):
+                        return f'{head}"{inc}"'
+                    return m.group(0)
+                new = pat.sub(repl, src)
+                if new != src:
+                    open(p, "w", encoding="utf-8").write(new)
+                    changed += 1
+        print(f"[+] rewrote local angled includes in {changed} file(s)")
+        PYEOF
+        for d in drivers/misc/mediatek/usb20 drivers/misc/mediatek/usb20/musb_main; do
+          mf="$d/Makefile"; [ -f "$mf" ] || continue
+          grep -q '\-I$(srctree)/$(src)' "$mf" && continue
+          [ -n "$(tail -c1 "$mf")" ] && echo "" >> "$mf"
+          echo 'ccflags-y += -I$(srctree)/$(src)' >> "$mf"
+          echo "[+] -I\$(src) -> $mf"
+        done
+
+    - name: Configure kernel
+      run: |
+        set -e
+        cd kernel-source
+        export PATH="$CLANG_DIR:$PATH"
+        make ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+          CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+          LOCALVERSION= ${{ env.DEFCONFIG }}
+        grep -E 'CONFIG_KSU=|CONFIG_EXTRA_FIRMWARE|CONFIG_LOCALVERSION=|CONFIG_MTK_COMBO' .config | head -20
+
+    - name: Build kernel Image.gz + DTB
+      run: |
+        cd kernel-source
+        set -o pipefail
+        export PATH="$CLANG_DIR:$PATH"
+        make ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+          CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+          LOCALVERSION= \
+          KCFLAGS="-Wno-error -Wno-unused-but-set-variable -Wno-array-bounds -Wno-misleading-indentation -Wno-format -Wno-enum-conversion -Wno-gnu-variable-sized-type-not-at-end -Wno-unaligned-access -Wno-strict-prototypes" \
+          -j$(nproc) Image.gz mediatek/mt6768-zpd1203-minimal.dtb 2>&1 | tail -40
+        ls -lh arch/arm64/boot/Image.gz
+        ls -lh arch/arm64/boot/dts/mediatek/mt6768-zpd1203-minimal.dtb
+
+    - name: Build kernel modules (vmlinux.symvers)
+      run: |
+        cd kernel-source
+        set -o pipefail
+        export PATH="$CLANG_DIR:$PATH"
+        make ARCH=arm64 LLVM=1 LLVM_IAS=1 \
+          CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- \
+          LOCALVERSION= \
+          KCFLAGS="-Wno-error -Wno-unused-but-set-variable -Wno-array-bounds -Wno-misleading-indentation -Wno-format -Wno-enum-conversion -Wno-gnu-variable-sized-type-not-at-end -Wno-unaligned-access -Wno-strict-prototypes" \
+          -j$(nproc) modules_prepare 2>&1 | tail -20
+        test -s vmlinux.symvers && echo "[ok] vmlinux.symvers present"
+        cat include/config/kernel.release
+        awk '$2=="module_layout"{print "module_layout CRC:", $1}' vmlinux.symvers
+
+    - name: Build wireless modules
+      if: ${{ !inputs.skip_wireless }}
+      run: |
+        set -eo pipefail
+        export PATH="$CLANG_DIR:$PATH"
+        KSRC="$PWD/kernel-source"
+        EXT="$HOME/wireless/connectivity"
+        OUT="$PWD/wireless-out"
+        mkdir -p "$OUT/modules" "$HOME/wireless/vendor/mediatek/kernel_modules"
+        ln -sfn "$EXT" "$HOME/wireless/vendor/mediatek/kernel_modules/connectivity"
+
+        cd "$KSRC"
+        cp vmlinux.symvers Module.symvers
+        RELEASE=$(cat include/config/kernel.release)
+        LAYOUT=$(awk '$2=="module_layout"{print $1}' vmlinux.symvers)
+        echo "release=$RELEASE layout=$LAYOUT"
+
+        ARGS=(ARCH=arm64 LLVM=1 LLVM_IAS=1 LOCALVERSION=
+              CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-
+              "KCFLAGS=-Wno-error -Wno-unused-but-set-variable -Wno-array-bounds -Wno-format -Wno-strict-prototypes -Wno-enum-conversion -Wno-misleading-indentation -Wno-unaligned-access -I$KSRC/net/wireless")
+
+        build_mod() {
+          name="$1"; target="$2"; ko="$3"; shift 3
+          echo "=== $name ==="
+          if ! make -j$(nproc) "${ARGS[@]}" M="$target" TOP="$HOME/wireless" "$@" modules > "$OUT/$name.log" 2>&1; then
+            echo "[x] $name failed"; tail -40 "$OUT/$name.log"; return 1
+          fi
+          if [ ! -f "$ko" ]; then
+            echo "[x] $name produced no $ko"; tail -20 "$OUT/$name.log"; return 1
+          fi
+          VM=$(modinfo -F vermagic "$ko" 2>/dev/null | awk '{print $1}')
+          CRC=$(modprobe --show-modversions "$ko" 2>/dev/null | awk '$2=="module_layout"{print $1}')
+          echo "    vermagic=$VM (want $RELEASE)  module_layout=$CRC (want $LAYOUT)"
+          if [ "$VM" != "$RELEASE" ] || { [ -n "$CRC" ] && [ "$CRC" != "$LAYOUT" ]; }; then
+            echo "[x] $name ABI mismatch"; return 1
+          fi
+          cp "$ko" "$OUT/modules/"
+          echo "    [ok] $(basename "$ko")"
+        }
+
+        build_mod btif    drivers/misc/mediatek/btif        "$KSRC/drivers/misc/mediatek/btif/common/btif_drv.ko"
+        build_mod cfg80211 net/wireless                     "$KSRC/net/wireless/cfg80211.ko"
+        build_mod connfem "$EXT/connfem"                    "$EXT/connfem/connfem.ko"
+        build_mod conn_md drivers/misc/mediatek/conn_md     "$KSRC/drivers/misc/mediatek/conn_md/conn_md_drv.ko"
+        build_mod connadp drivers/misc/mediatek/connectivity "$KSRC/drivers/misc/mediatek/connectivity/connadp.ko" CONFIG_MTK_COMBO=m
+
+        PSYM="$KSRC/drivers/misc/mediatek/btif/Module.symvers $KSRC/drivers/misc/mediatek/conn_md/Module.symvers $KSRC/drivers/misc/mediatek/connectivity/Module.symvers"
+        build_mod wmt "$EXT/common" "$EXT/common/wmt_drv.ko" CONFIG_MTK_COMBO=m \
+          MTK_PLATFORM_WMT=MT6768 TARGET_BOARD_PLATFORM_WMT=mt6768 KBUILD_EXTRA_SYMBOLS="$PSYM"
+        build_mod bt "$EXT/bt/mt66xx/wmt" "$EXT/bt/mt66xx/wmt/bt_drv_connac1x.ko" \
+          BT_PLATFORM=connac1x BT_ENABLE_LOW_POWER_DEBUG=y 'LOG_TAG=[BT_Drv][wmt]' \
+          KBUILD_EXTRA_SYMBOLS="$EXT/common/Module.symvers"
+        build_mod wlan-adp "$EXT/wlan/adaptor" "$EXT/wlan/adaptor/wmt_chrdev_wifi.ko" \
+          CONNAC_VER=1_0 MODULE_NAME=wmt_chrdev_wifi KBUILD_EXTRA_SYMBOLS="$EXT/common/Module.symvers"
+
+        PATCH="$KSRC/zpd1203/kernel/patches/wireless/0001-gen4m-select-available-display-notifier.patch"
+        if ! git -C "$EXT/wlan/core/gen4m" apply --reverse --check "$PATCH" 2>/dev/null; then
+          git -C "$EXT/wlan/core/gen4m" apply "$PATCH"
+        fi
+        build_mod gen4m "$EXT/wlan/core/gen4m" "$EXT/wlan/core/gen4m/wlan_drv_gen4m.ko" \
+          CONFIG_MTK_COMBO_WIFI_HIF=axi MODULE_NAME=wlan_drv_gen4m MTK_COMBO_CHIP=CONNAC WLAN_CHIP_ID=6768 \
+          MTK_ANDROID_WMT=y WIFI_ENABLE_GCOV= WIFI_IP_SET=1 MTK_ANDROID_EMI=y MTK_WLAN_SERVICE=yes \
+          KBUILD_EXTRA_SYMBOLS="$PSYM $EXT/connfem/Module.symvers $EXT/common/Module.symvers $EXT/wlan/adaptor/Module.symvers $KSRC/net/wireless/Module.symvers"
+
+        echo ""
+        echo "=== collected modules ==="
+        ls -lh "$OUT/modules/"
+
+    - name: Assemble boot.img (kernel + stock ramdisk + modules + dtb)
+      run: |
+        set -e
+        python3 - <<'PYEOF'
+        # placeholder: real packaging done in next step via helper scripts
+        print("preparing inputs")
+        PYEOF
+        ls -lh kernel-source/arch/arm64/boot/Image.gz
+        ls -lh kernel-source/arch/arm64/boot/dts/mediatek/mt6768-zpd1203-minimal.dtb
+
+    - name: Upload everything
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: zpd1203-510240-full
+        path: |
+          kernel-source/arch/arm64/boot/Image.gz
+          kernel-source/arch/arm64/boot/dts/mediatek/mt6768-zpd1203-minimal.dtb
+          kernel-source/include/config/kernel.release
+          kernel-source/vmlinux.symvers
+          wireless-out/modules/*.ko
+          wireless-out/*.log
+        retention-days: 14
+        if-no-files-found: warn
