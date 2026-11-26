@@ -114,6 +114,7 @@ jobs:
         # Makefiles whose last line is "endif" without a trailing newline
         # (e.g. sensors-1.0/situation), so patch targeted dirs explicitly.
         for d in \
+            drivers/misc/mediatek/usb20 \
             drivers/misc/mediatek/usb20/musb_main \
             ; do
           mf="$d/Makefile"
@@ -125,8 +126,8 @@ jobs:
           echo "[+] Fix C: added -I\$(src) to $mf"
         done
 
-        echo "--- verify musb Makefile (must end with ccflags line) ---"
-        tail -3 drivers/misc/mediatek/usb20/musb_main/Makefile
+        echo "--- verify usb20 Makefiles ---"
+        tail -2 drivers/misc/mediatek/usb20/Makefile; tail -2 drivers/misc/mediatek/usb20/musb_main/Makefile
 
     - name: Configure kernel
       run: |
