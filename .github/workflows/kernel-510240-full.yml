@@ -245,15 +245,63 @@ jobs:
         echo "=== collected modules ==="
         ls -lh "$OUT/modules/"
 
-    - name: Assemble boot.img (kernel + stock ramdisk + modules + dtb)
+    - name: Build Android 12 ramdisk with wireless modules
       run: |
         set -e
+        export PATH="$CLANG_DIR:$PATH"
+        KSRC="$PWD/kernel-source"
+        mkdir -p pkg/out
+
+        # extract stock ramdisk from the repo's boot_a.img
         python3 - <<'PYEOF'
-        # placeholder: real packaging done in next step via helper scripts
-        print("preparing inputs")
+        import struct, os
+        data = open("boot_a.img", "rb").read()
+        page = struct.unpack("<I", data[36:40])[0]
+        ks = struct.unpack("<I", data[8:12])[0]
+        rs = struct.unpack("<I", data[16:20])[0]
+        pages = lambda n: (n + page - 1)//page if n else 0
+        r_off = page + pages(ks)*page
+        rd = data[r_off:r_off+rs]
+        os.makedirs("pkg/extracted/boot", exist_ok=True)
+        open("pkg/extracted/boot/ramdisk", "wb").write(rd)
+        print(f"stock ramdisk: {len(rd):,} bytes -> pkg/extracted/boot/ramdisk")
         PYEOF
-        ls -lh kernel-source/arch/arm64/boot/Image.gz
-        ls -lh kernel-source/arch/arm64/boot/dts/mediatek/mt6768-zpd1203-minimal.dtb
+
+        cp "$KSRC/zpd1203/scripts/build_android12_ramdisk.sh" pkg/build_ramdisk.sh
+        chmod +x pkg/build_ramdisk.sh
+
+        ROOT="$PWD/pkg" \
+        STOCK_RD="$PWD/pkg/extracted/boot/ramdisk" \
+        OUT_RD="$PWD/pkg/out/ramdisk-android12.cpio.gz" \
+        RADIO_MODULE_DIR="$PWD/wireless-out/modules" \
+        bash pkg/build_ramdisk.sh 2>&1 | tail -30
+
+        ls -lh pkg/out/ramdisk-android12.cpio.gz
+
+    - name: Assemble final boot.img
+      run: |
+        set -e
+        KSRC="$PWD/kernel-source"
+        mkdir -p pkg/out
+
+        # wrap the minimal DTB into an Android DT table
+        python3 tools/wrap_dt_table.py \
+          "$KSRC/arch/arm64/boot/dts/mediatek/mt6768-zpd1203-minimal.dtb" \
+          pkg/out/dtb.dtimg --page-size 2048 --id 0 --rev 0
+
+        CMDLINE='bootopt=64S3,32N2,64N2 buildvariant=user console=tty0 8250.nr_uarts=2 cpuidle.off=1 printk.devkmsg=on ignore_loglevel loglevel=8 clk_ignore_unused pd_ignore_unused regulator_ignore_unused fbcon=rotate:2 fbcon=font:TER16x32'
+
+        python3 tools/pack_boot_v2.py \
+          --kernel "$KSRC/arch/arm64/boot/Image.gz" \
+          --ramdisk pkg/out/ramdisk-android12.cpio.gz \
+          --dtb pkg/out/dtb.dtimg \
+          --cmdline "$CMDLINE" \
+          -o pkg/out/boot_a_510240_wireless.img
+
+        ls -lh pkg/out/boot_a_510240_wireless.img
+        echo "partition limit 33554432 -> actual $(stat -c%s pkg/out/boot_a_510240_wireless.img)"
+        test "$(stat -c%s pkg/out/boot_a_510240_wireless.img)" -le 33554432 \
+          || { echo "[x] boot.img exceeds 32MB partition"; exit 1; }
 
     - name: Upload everything
       if: always()
@@ -267,5 +315,8 @@ jobs:
           kernel-source/vmlinux.symvers
           wireless-out/modules/*.ko
           wireless-out/*.log
+          pkg/out/boot_a_510240_wireless.img
+          pkg/out/ramdisk-android12.cpio.gz
+          pkg/out/dtb.dtimg
         retention-days: 14
         if-no-files-found: warn
