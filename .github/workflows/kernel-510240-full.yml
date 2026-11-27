@@ -43,6 +43,21 @@ jobs:
         sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 || \
           sudo apt-get install -y --no-install-recommends libc6-dev-amd64 || true
         sudo ln -sf /usr/bin/python3 /usr/bin/python
+
+        # ramdisk init wrapper is compiled with aarch64-linux-gnu-gcc.
+        # Ubuntu may only ship the version-suffixed binary; make the plain
+        # name resolvable either way.
+        if ! command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
+          for v in 13 12 11 10; do
+            if [ -x "/usr/bin/aarch64-linux-gnu-gcc-$v" ]; then
+              sudo ln -sf "/usr/bin/aarch64-linux-gnu-gcc-$v" /usr/bin/aarch64-linux-gnu-gcc
+              break
+            fi
+          done
+        fi
+        command -v aarch64-linux-gnu-gcc && aarch64-linux-gnu-gcc --version | head -1
+        command -v arm-linux-gnueabi-gcc || true
+
         gcc --version | head -1
         echo '#include <dirent.h>
         int main(void){return 0;}' > /tmp/hdrtest.c
