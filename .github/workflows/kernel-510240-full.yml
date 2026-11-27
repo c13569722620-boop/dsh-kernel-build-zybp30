@@ -37,8 +37,16 @@ jobs:
           libncurses-dev rsync kmod cpio wget xz-utils lz4 zstd \
           gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
           fakeroot device-tree-compiler android-sdk-libsparse-utils
+        # The ramdisk init wrapper is compiled with the HOST gcc. Its headers
+        # pull in <bits/wordsize.h> which lives in the multiarch dev package;
+        # without it the build dies with "bits/wordsize.h: No such file".
+        sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386 || \
+          sudo apt-get install -y --no-install-recommends libc6-dev-amd64 || true
         sudo ln -sf /usr/bin/python3 /usr/bin/python
         gcc --version | head -1
+        echo '#include <dirent.h>
+        int main(void){return 0;}' > /tmp/hdrtest.c
+        gcc -o /tmp/hdrtest /tmp/hdrtest.c && echo "[ok] host gcc can build dirent programs"
 
     - name: Fetch Clang 21.1.8
       run: |
@@ -274,8 +282,16 @@ jobs:
         STOCK_RD="$PWD/pkg/extracted/boot/ramdisk" \
         OUT_RD="$PWD/pkg/out/ramdisk-android12.cpio.gz" \
         RADIO_MODULE_DIR="$PWD/wireless-out/modules" \
-        bash pkg/build_ramdisk.sh 2>&1 | tail -30
+        bash pkg/build_ramdisk.sh 2>&1 | tee ramdisk-build.log | tail -40
 
+        if [ ! -f pkg/out/ramdisk-android12.cpio.gz ]; then
+          echo "=== ramdisk build failed, last 60 lines ==="
+          tail -60 ramdisk-build.log
+          echo "=== host header check ==="
+          ls -l /usr/include/bits/wordsize.h 2>&1 || true
+          ls -l /usr/include/x86_64-linux-gnu/bits/wordsize.h 2>&1 || true
+          exit 1
+        fi
         ls -lh pkg/out/ramdisk-android12.cpio.gz
 
     - name: Assemble final boot.img
