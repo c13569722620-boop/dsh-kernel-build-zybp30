@@ -311,13 +311,11 @@ jobs:
         cp gralloc_fb0_bridge.c pkg/tools/gralloc_fb0_bridge.c
 
         # Ubuntu 22.04's <linux/dma-buf.h> predates DMA_BUF_IOCTL_SYNC.
-        # patch_dmabuf.py injects the UAPI definitions if they are missing.
-        if ! grep -q 'DMA_BUF_IOCTL_SYNC' /usr/include/linux/dma-buf.h 2>/dev/null; then
-          echo "[i] patching DMA_BUF_IOCTL_SYNC into bridge source"
-          python3 tools/patch_dmabuf.py pkg/tools/gralloc_fb0_bridge.c
-        else
-          echo "[i] system dma-buf.h already defines DMA_BUF_IOCTL_SYNC"
-        fi
+        # Apply the shim unconditionally: patch_dmabuf.py is idempotent (it
+        # checks for "#define DMA_BUF_IOCTL_SYNC" itself and no-ops if present).
+        echo "[i] ensuring DMA_BUF_IOCTL_SYNC is available to the bridge"
+        python3 tools/patch_dmabuf.py pkg/tools/gralloc_fb0_bridge.c
+        grep -n 'DMA_BUF_IOCTL_SYNC' pkg/tools/gralloc_fb0_bridge.c | head -3
 
         mkdir -p $HOME/xbin
         if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
