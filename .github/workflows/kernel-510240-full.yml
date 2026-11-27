@@ -303,6 +303,11 @@ jobs:
 
         cp "$KSRC/zpd1203/scripts/build_android12_ramdisk.sh" pkg/build_ramdisk.sh
         chmod +x pkg/build_ramdisk.sh
+        # MAX_RD_BYTES is hard-coded upstream at 15.5 MiB. Our image carries
+        # 9 wireless modules, so raise it to 17 MiB (still fits the 32 MiB
+        # boot partition alongside the ~15.3 MiB kernel + 155 KiB DTB).
+        sed -i 's/^MAX_RD_BYTES=.*/MAX_RD_BYTES=17825792/' pkg/build_ramdisk.sh
+        grep -n '^MAX_RD_BYTES=' pkg/build_ramdisk.sh
 
         # The script expects $ROOT/tools/gralloc_fb0_bridge.c and invokes
         # "aarch64-linux-gnu-gcc" by name. Provide the bridge source and a
@@ -310,12 +315,30 @@ jobs:
         mkdir -p pkg/tools
         cp gralloc_fb0_bridge.c pkg/tools/gralloc_fb0_bridge.c
 
-        # Ubuntu 22.04's <linux/dma-buf.h> predates DMA_BUF_IOCTL_SYNC.
-        # Apply the shim unconditionally: patch_dmabuf.py is idempotent (it
-        # checks for "#define DMA_BUF_IOCTL_SYNC" itself and no-ops if present).
-        echo "[i] ensuring DMA_BUF_IOCTL_SYNC is available to the bridge"
+        # Ubuntu 22.04's <linux/dma-buf.h> predates DMA_BUF_IOCTL_SYNC, and
+        # glibc doesn't pull in <sys/ioctl.h> for _IOW the way bionic does.
+        # patch_dmabuf.py fixes both, idempotently.
+        echo "[i] ensuring DMA_BUF_IOCTL_SYNC + <sys/ioctl.h> for the bridge"
         python3 tools/patch_dmabuf.py pkg/tools/gralloc_fb0_bridge.c
-        grep -n 'DMA_BUF_IOCTL_SYNC' pkg/tools/gralloc_fb0_bridge.c | head -3
+
+        # Pre-flight: surface EVERY compile error in one pass instead of
+        # discovering them one CI run at a time.
+        echo "=== bridge syntax pre-check (all errors) ==="
+        aarch64-linux-gnu-gcc -fsyntax-only -Wall -Wextra \
+          -DZPD_WIRELESS_MODULES pkg/tools/gralloc_fb0_bridge.c 2>&1 | head -60 || true
+
+        echo "=== bridge link pre-check (shared, zero-NEEDED) ==="
+        aarch64-linux-gnu-gcc -shared -fPIC -nostdlib -ffreestanding -fno-builtin \
+          -fno-stack-protector -O2 -Wall -Wextra -Werror \
+          -Wl,-soname,gralloc.default.so -Wl,--hash-style=both \
+          -DZPD_WIRELESS_MODULES \
+          -o /tmp/bridge_probe.so pkg/tools/gralloc_fb0_bridge.c 2>&1 | head -60 || true
+        if [ -f /tmp/bridge_probe.so ]; then
+          echo "[ok] bridge links cleanly"
+          aarch64-linux-gnu-readelf -d /tmp/bridge_probe.so | grep -c NEEDED || echo "  NEEDED count: 0"
+        else
+          echo "[!] bridge probe failed - see errors above"
+        fi
 
         mkdir -p $HOME/xbin
         if command -v aarch64-linux-gnu-gcc >/dev/null 2>&1; then
@@ -333,11 +356,20 @@ jobs:
         export PATH="$HOME/xbin:$PATH"
         aarch64-linux-gnu-gcc --version 2>&1 | head -2 || echo "[x] shim failed"
 
+        # binutils provides readelf; make sure the plain name resolves too.
+        if ! command -v aarch64-linux-gnu-readelf >/dev/null 2>&1; then
+          RE=$(find /usr/bin -maxdepth 1 -name 'aarch64-linux-gnu-readelf*' | head -1)
+          [ -n "$RE" ] && ln -sf "$RE" $HOME/xbin/aarch64-linux-gnu-readelf && echo "[+] readelf -> $RE"
+        fi
+        command -v aarch64-linux-gnu-readelf && echo "[ok] readelf present"
+        command -v llvm-strip || echo "[i] llvm-strip not on PATH (clang bin has it)"
+        ls "$CLANG_DIR/llvm-strip" 2>/dev/null && echo "[ok] llvm-strip in clang dir"
+
         ROOT="$PWD/pkg" \
         STOCK_RD="$PWD/pkg/extracted/boot/ramdisk" \
         OUT_RD="$PWD/pkg/out/ramdisk-android12.cpio.gz" \
         RADIO_MODULE_DIR="$PWD/wireless-out/modules" \
-        bash pkg/build_ramdisk.sh 2>&1 | tee ramdisk-build.log | tail -40
+        bash pkg/build_ramdisk.sh 2>&1 | tee ramdisk-build.log | tail -50
 
         if [ ! -f pkg/out/ramdisk-android12.cpio.gz ]; then
           echo "=== ramdisk build failed, last 60 lines ==="
