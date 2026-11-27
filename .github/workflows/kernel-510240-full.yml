@@ -316,11 +316,11 @@ jobs:
           ln -sf "$(command -v aarch64-linux-gnu-gcc)" $HOME/xbin/aarch64-linux-gnu-gcc
         else
           echo "[!] cross gcc missing, creating clang-based shim"
-          cat > $HOME/xbin/aarch64-linux-gnu-gcc <<'SHIM'
-#!/bin/bash
-# Minimal shim: drive clang as an aarch64 cross compiler.
-exec "$CLANG_DIR/clang" --target=aarch64-linux-gnu -fuse-ld=lld "$@"
-SHIM
+          printf '%s\n' \
+            '#!/bin/bash' \
+            '# Minimal shim: drive clang as an aarch64 cross compiler.' \
+            'exec "$CLANG_DIR/clang" --target=aarch64-linux-gnu -fuse-ld=lld "$@"' \
+            > $HOME/xbin/aarch64-linux-gnu-gcc
           chmod +x $HOME/xbin/aarch64-linux-gnu-gcc
         fi
         export PATH="$HOME/xbin:$PATH"
