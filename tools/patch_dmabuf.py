@@ -1,15 +1,24 @@
 #!/usr/bin/env python3
-"""Inject DMA_BUF_IOCTL_SYNC UAPI definitions into a C source if missing.
+"""Make gralloc_fb0_bridge.c build against glibc (Ubuntu) headers.
 
-Ubuntu 22.04 ships a <linux/dma-buf.h> that lacks the sync ioctl introduced
-later upstream, which makes gralloc_fb0_bridge.c fail with
-"expected expression before 'struct'".
+Two problems show up when compiling the upstream bridge on Ubuntu 22.04
+instead of Android's bionic:
+
+1. <linux/dma-buf.h> there predates DMA_BUF_IOCTL_SYNC, so the identifier is
+   unknown.
+2. Even after defining DMA_BUF_IOCTL_SYNC = _IOW(...), `_IOW` itself comes
+   from <sys/ioctl.h>, which the file never includes -- bionic pulls it in
+   indirectly, glibc does not.  Without it the macro expands to garbage and
+   gcc reports "expected expression before 'struct'".
+
+This script injects both, idempotently.
 """
 import sys
 
-MARKER = "#include <linux/dma-buf.h>"
+DMABUF_ANCHOR = "#include <linux/dma-buf.h>"
+IOCTL_INCLUDE = "#include <sys/ioctl.h>"
 
-ADDITION = MARKER + """
+DMABUF_BLOCK = DMABUF_ANCHOR + """
 #ifndef DMA_BUF_IOCTL_SYNC
 struct dma_buf_sync {
 \tunsigned long long flags;
@@ -32,17 +41,39 @@ def main() -> int:
     with open(path, encoding="utf-8", errors="replace") as f:
         src = f.read()
 
-    if "#define DMA_BUF_IOCTL_SYNC" in src:
-        print("[i] DMA_BUF_IOCTL_SYNC already defined, nothing to do")
-        return 0
-    if MARKER not in src:
-        print(f"[x] anchor not found: {MARKER}", file=sys.stderr)
-        return 1
+    changed = False
 
-    src = src.replace(MARKER, ADDITION, 1)
-    with open(path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(src)
-    print("[+] injected DMA_BUF_IOCTL_SYNC definitions")
+    # 1) <sys/ioctl.h> for _IOW
+    if "\n#include <sys/ioctl.h>" not in src and "include <sys/ioctl.h>" not in src:
+        if DMABUF_ANCHOR in src:
+            src = src.replace(DMABUF_ANCHOR, IOCTL_INCLUDE + "\n" + DMABUF_ANCHOR, 1)
+            changed = True
+            print("[+] added #include <sys/ioctl.h>")
+        else:
+            print("[x] could not find dma-buf.h anchor", file=sys.stderr)
+            return 1
+    else:
+        print("[i] <sys/ioctl.h> already included")
+
+    # 2) DMA_BUF_IOCTL_SYNC fallback definitions
+    if "#define DMA_BUF_IOCTL_SYNC" in src:
+        print("[i] DMA_BUF_IOCTL_SYNC already defined")
+    else:
+        # re-read anchor position (it may have shifted)
+        anchor = "#include <sys/ioctl.h>\n" + DMABUF_ANCHOR
+        use = anchor if anchor in src else DMABUF_ANCHOR
+        block = (("#include <sys/ioctl.h>\n" + DMABUF_BLOCK) if use == anchor
+                 else DMABUF_BLOCK)
+        src = src.replace(use, block, 1)
+        changed = True
+        print("[+] injected DMA_BUF_IOCTL_SYNC definitions")
+
+    if changed:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(src)
+        print(f"[ok] patched {path}")
+    else:
+        print("[i] nothing to change")
     return 0
 
 
