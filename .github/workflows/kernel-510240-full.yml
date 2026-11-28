@@ -456,6 +456,22 @@ jobs:
         test "$(stat -c%s pkg/out/boot_a_510240_wireless.img)" -le 33554432 \
           || { echo "[x] boot.img exceeds 32MB partition"; exit 1; }
 
+        # Pad to the exact partition size and append an AVB footer, matching
+        # how the stock image fills boot_a. LK reads the partition by size;
+        # a short image can leave stale tail data that some LK builds reject.
+        echo ""
+        echo "=== pad to partition size + AVB footer ==="
+        cp pkg/out/boot_a_510240_wireless.img pkg/out/boot_a_510240_wireless.raw.img
+        python3 tools/pad_boot_avb.py \
+          pkg/out/boot_a_510240_wireless.raw.img \
+          --partition-size 33554432 \
+          --out pkg/out/boot_a_510240_wireless.img
+
+        echo ""
+        echo "=== final image ==="
+        ls -lh pkg/out/boot_a_510240_wireless.img
+        python3 tools/inspect_boot_tail.py pkg/out/boot_a_510240_wireless.img
+
     - name: Upload everything
       if: always()
       uses: actions/upload-artifact@v4
