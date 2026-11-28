@@ -402,13 +402,13 @@ jobs:
         # silently (fakeroot state masking), so verify and repair here.
         echo ""
         echo "=== verify /init inside ramdisk ==="
-        python3 tools/check_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz
+        # NOTE: this check intentionally returns 1 when /init is bad; guard it
+        # so `set -e` doesn't abort before the repair step runs.
+        python3 tools/check_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz || true
 
         if [ -f pkg/out/init-wrapper ] && \
            ! python3 tools/check_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz --quiet; then
           echo "[!] /init missing or wrong -> repairing"
-          XZ_TAIL=""
-          # split off any trailing xz member so we can re-append it
           python3 tools/split_ramdisk_tail.py pkg/out/ramdisk-android12.cpio.gz pkg/out/_rd_gz.bin pkg/out/_rd_tail.bin
           if [ -s pkg/out/_rd_tail.bin ]; then
             cp pkg/out/_rd_gz.bin pkg/out/_rd_gz_only.cpio.gz
@@ -419,8 +419,15 @@ jobs:
             python3 tools/fix_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz pkg/out/init-wrapper
           fi
           echo "=== re-verify ==="
-          python3 tools/check_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz
+          python3 tools/check_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz || true
         fi
+
+        # hard gate: /init must be a regular ELF by now
+        if ! python3 tools/check_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz --quiet; then
+          echo "[x] FATAL: ramdisk still has no usable /init -- refusing to package"
+          exit 1
+        fi
+        echo "[ok] ramdisk ready: $(stat -c %s pkg/out/ramdisk-android12.cpio.gz) bytes"
 
         echo "[ok] ramdisk ready: $(stat -c %s pkg/out/ramdisk-android12.cpio.gz) bytes"
 
