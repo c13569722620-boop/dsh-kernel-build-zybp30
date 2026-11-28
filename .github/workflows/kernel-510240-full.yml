@@ -356,6 +356,24 @@ jobs:
         export PATH="$HOME/xbin:$PATH"
         aarch64-linux-gnu-gcc --version 2>&1 | head -2 || echo "[x] shim failed"
 
+        # Build the static /init wrapper OURSELVES to a known path, so we can
+        # repair the ramdisk if the upstream script fails to include it.
+        # The C source is embedded in build_ramdisk.sh between the heredoc
+        # markers; extract it verbatim.
+        echo "=== extract a12_init_wrapper.c from build_ramdisk.sh ==="
+        python3 tools/extract_init_wrapper.py pkg/build_ramdisk.sh pkg/out/a12_init_wrapper.c
+        ls -l pkg/out/a12_init_wrapper.c
+        echo "=== build static init wrapper ==="
+        aarch64-linux-gnu-gcc -static -O2 -s -Wall -Wextra \
+          -DZPD_WIRELESS_MODULES \
+          -o pkg/out/init-wrapper pkg/out/a12_init_wrapper.c 2>&1 | head -30 || true
+        if [ -f pkg/out/init-wrapper ]; then
+          ls -lh pkg/out/init-wrapper
+          head -c4 pkg/out/init-wrapper | xxd | head -1
+        else
+          echo "[!] wrapper build failed (upstream script will try again)"
+        fi
+
         # binutils provides readelf; make sure the plain name resolves too.
         if ! command -v aarch64-linux-gnu-readelf >/dev/null 2>&1; then
           RE=$(find /usr/bin -maxdepth 1 -name 'aarch64-linux-gnu-readelf*' | head -1)
@@ -377,6 +395,34 @@ jobs:
           exit 1
         fi
         ls -lh pkg/out/ramdisk-android12.cpio.gz
+
+        # ---- CRITICAL: /init must exist or the device hangs on the 2nd splash.
+        # The upstream script deletes the stock /init symlink and relies on a
+        # freshly built static wrapper landing in the cpio. That step can fail
+        # silently (fakeroot state masking), so verify and repair here.
+        echo ""
+        echo "=== verify /init inside ramdisk ==="
+        python3 tools/check_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz
+
+        if [ -f pkg/out/init-wrapper ] && \
+           ! python3 tools/check_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz --quiet; then
+          echo "[!] /init missing or wrong -> repairing"
+          XZ_TAIL=""
+          # split off any trailing xz member so we can re-append it
+          python3 tools/split_ramdisk_tail.py pkg/out/ramdisk-android12.cpio.gz pkg/out/_rd_gz.bin pkg/out/_rd_tail.bin
+          if [ -s pkg/out/_rd_tail.bin ]; then
+            cp pkg/out/_rd_gz.bin pkg/out/_rd_gz_only.cpio.gz
+            python3 tools/fix_ramdisk_init.py pkg/out/_rd_gz_only.cpio.gz pkg/out/init-wrapper \
+              --append-xz pkg/out/_rd_tail.bin \
+              --out pkg/out/ramdisk-android12.cpio.gz
+          else
+            python3 tools/fix_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz pkg/out/init-wrapper
+          fi
+          echo "=== re-verify ==="
+          python3 tools/check_ramdisk_init.py pkg/out/ramdisk-android12.cpio.gz
+        fi
+
+        echo "[ok] ramdisk ready: $(stat -c %s pkg/out/ramdisk-android12.cpio.gz) bytes"
 
     - name: Assemble final boot.img
       run: |
