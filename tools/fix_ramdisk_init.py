@@ -114,7 +114,9 @@ def main():
     print(f"'init' present: {has_init}")
 
     init_body = open(args.init_binary, "rb").read()
-    print(f"init binary: {len(init_body):,} bytes  ELF={init_body[:4] == b'\x7fELF'}")
+    elf_magic = b"\x7fELF"
+    is_elf = init_body[:4] == elf_magic
+    print("init binary: {:,} bytes  ELF={}".format(len(init_body), is_elf))
 
     changed = False
 
